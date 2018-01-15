@@ -197,6 +197,30 @@ def dataProcessing(posts, emotions, emotion_normalize=True):
 
     return cp, dataE, id_map
 
+def dataProcessingNoEmotion(posts, posts_ids):
+    ## subtract posts not in posts_ids ##
+    posts_new = {}
+    for key in posts:
+        if key not in posts_ids:
+            print "content without emoticon", key
+            continue
+        posts_new[key] = posts[key]
+    posts = posts_new
+    ## dictionary to list ##
+    content_list = []
+    id_list = []
+    for post_id in posts:
+        id_list.append(post_id)
+        content_list.append(posts[post_id])
+    ## clean text content ##
+    cp = Corpus(content_list)
+    cp.preprocessing()
+    ## id_map ##
+    id_map = [id_list[cp.doc_id_map["clean2raw"][i_doc]] for i_doc in range(cp.Ndocs)]
+    id_map_reverse = {}
+    for i in range(len(id_map)):
+        id_map_reverse[id_map[i]] = i
+    return cp, id_map, id_map_reverse
 
 if __name__ == "__main__":
     filename = "data/CNN"

@@ -7,14 +7,14 @@ np.seterr(over="raise")
 
 def probNormalize(distributions):
     if distributions.ndim > 1:
-        return distributions / np.sum(distributions, axis=1, keepdims=True)
+        return distributions / np.sum(distributions, axis=-1, keepdims=True)
     else:
         return distributions / np.sum(distributions)
 
 def probNormalizeLog(distributions):
     """ from log unnormalized distribution to normalized distribution """
     if distributions.ndim > 1:
-        distributions = distributions - np.max(distributions, axis=1,keepdims=True)
+        distributions = distributions - np.max(distributions, axis=-1,keepdims=True)
     else:
         distributions = distributions - np.max(distributions)
     try:

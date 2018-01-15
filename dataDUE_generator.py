@@ -5,7 +5,7 @@ from multiprocessing import Process, Queue
 import os
 from datetime import datetime
 
-class dataDUE(object):
+class dataDUELoader(object):
     def __init__(self, meta_data_file, batch_data_dir, id_map, max_qsize = 5000, batch_size=1, random_shuffle=False):
 
         self.E = 0                                  # dimension of emotion
@@ -17,8 +17,15 @@ class dataDUE(object):
             meta_data = cPickle.load(f)
             self.E = meta_data["E"]
             self.U = meta_data["U"]
-            self.Md = meta_data["Md"]
             self.D = meta_data["D"]
+            self.Md = [0 for i in range(self.D)]
+            for pid in meta_data["Md"]:
+                if pid not in id_map:
+                    # print pid    ### test
+                    continue
+
+                self.Md[id_map[pid]] = meta_data["Md"][pid]
+
         self.id_map = id_map                        # id_map between post_id and document_id
         self.batch_data_dir = batch_data_dir
 
@@ -43,8 +50,11 @@ class dataDUE(object):
                 duration = datetime.now() - start
                 print "_dataBatchReader: load %s takes %f s" % (fn, duration.total_seconds())
                 for post_id in posts:
+                    if post_id not in self.id_map:
+                        continue
                     document_id = self.id_map[post_id]
                     data_queue.put([document_id, posts[post_id]], block=True, timeout=timeout)   # set max waiting time
+                del posts
 
     def dataReaderTerminate(self):
         ## in case, to manually terminate self.data_reader ##
@@ -67,5 +77,16 @@ class dataDUE(object):
         """
         for doc_cnt in range(self.D):
             yield self.data_queue.get(block=True, timeout=100)
+
+if __name__ == "__main__":
+    data_prefix = "CNN_K10_"
+    batch_rBp_dir = "data/" + data_prefix + "reactionsByPost_batch"
+    meta_data_file = "data/" + data_prefix + "meta_data"
+    id_map_file = "data/" + data_prefix + "post_id_map"
+
+    id_map, id_map_reverse = cPickle.load(open(id_map_file, "r"))
+
+    dataDUE = dataDUELoader(meta_data_file=meta_data_file, batch_data_dir=batch_rBp_dir, id_map=id_map_reverse)
+
 
 

@@ -12,9 +12,9 @@ from tqdm import tqdm
 import cPickle
 
 from functions import probNormalize, multinomial, logfactorial, probNormalizeLog, logfactorialSparse
-from dataDUE_generator import dataDUE
+from dataDUE_generator import dataDUELoader
 
-np.seterr(divide='raise')
+np.seterr(divide='raise', over='raise')
 
 class PRET(object):
     def __init__(self, K, G):
@@ -131,7 +131,7 @@ class PRET(object):
 
         self.theta = probNormalize(np.random.random([self.K]))
         self.pi = probNormalize(np.random.random([2]))
-        self.eta = probNormalize(np.random.random([self.K, self.G, self.E]))
+        self.eta = probNormalize(np.random.random([self.K, self.G, self.E]) + 0.1)
         self.phiB = probNormalize(np.random.random([self.V]))
         self.phiT = probNormalize(np.random.random([self.K, self.V]))
         self.psi = probNormalize(np.random.random([self.U, self.G]))
@@ -142,16 +142,21 @@ class PRET(object):
         for d in range(self.D):
             self.z[d] = multinomial(self.theta)
             self.y.append(multinomial(self.pi, self.Nd[d]))
-            doc_x = []
-            for m in range(self.Md[d]):
-                u = np.random.randint(0,self.U)
-                doc_x.append(multinomial(self.psi[u]))
-            self.x.append(np.array(doc_x, dtype=np.int8))
+            ## time consuming, replaced with below ##
+            # doc_x = []
+            # for m in range(self.Md[d]):
+            #     u = np.random.randint(0,self.U)
+            #     doc_x.append(multinomial(self.psi[u]))
+            # self.x.append(np.array(doc_x, dtype=np.int8))
+            self.x.append(multinomial(self.psi[0], self.Md[d]))
+
 
         duration = datetime.now() - start
         print "_initialize() takes %fs" % duration.total_seconds()
 
     def _intermediateParameterInitialize(self, dataDUE, dataW, dataToken):
+        start = datetime.now()
+
         self.YI = np.zeros([2], dtype=np.int32)
         self.Y0V = np.zeros([self.V], dtype=np.int32)
         self.Y1TV = np.zeros([self.K, self.V], dtype=np.int32)
@@ -161,7 +166,7 @@ class PRET(object):
         self.DY1V = lil_matrix((self.D, self.V), dtype = np.int8)
         self.DXE = np.zeros([self.D, self.G, self.E], dtype = np.int32)
 
-        for d, [doc_u, doc_e] in dataDUE.generate(batch_size=1, random_shuffle=False):
+        for d, [doc_u, doc_e] in dataDUE.generate():
             self.TI[self.z[d]] += 1
             docToken = dataToken[d]
             doc_z = self.z[d]
@@ -183,7 +188,9 @@ class PRET(object):
                 self.TXE[doc_z, x, e] += 1
                 self.UX[u, x] += 1
                 self.DXE[d, x, e] += 1
-        # self.DY1V = self.DY1V.tocsr()
+
+        duration = datetime.now() - start
+        print "_intermediateParameterInitialize() takes %fs" % duration.total_seconds()
 
     def _GibbsSamplingLocal(self, dataDUE, dataW, dataToken, epoch):
         """
@@ -191,7 +198,7 @@ class PRET(object):
                         document-level topic
                         emoticon-level group
         """
-        pbar = tqdm(dataDUE.generate(batch_size=1, random_shuffle=False),
+        pbar = tqdm(dataDUE.generate(),
                     total = self.D,
                     desc = '({0:^3})'.format(epoch))
         for d, [doc_u, doc_e] in pbar:
@@ -208,6 +215,7 @@ class PRET(object):
             for n in xrange(doc_Nd):
                 Y1T = self._y_update(d, n, doc_u, doc_e, docW, docToken, Y1T)
 
+            ## test ###
             # update emoticon-level group #
             TX = np.sum(self.TXE, axis=-1)
             for m in xrange(doc_Md):
@@ -236,7 +244,7 @@ class PRET(object):
         self.z[d] = doc_z_new
         TI_no_d[doc_z_new] += 1
         TXE_no_d[doc_z_new, :, :] += doc_XE
-        Y1TV_no_d[doc_z_new, :, :] += doc_Y1V_array
+        Y1TV_no_d[doc_z_new, :] += doc_Y1V_array
         self.TI, self.TXE, self.Y1TV = TI_no_d, TXE_no_d, Y1TV_no_d
 
     def _prob_doc_z(self, TI_no_d, TXE_no_d, Y1TV_no_d, doc_XE, doc_Y1V):
@@ -308,9 +316,10 @@ class PRET(object):
         x = self.x[d][m]
 
         # calculate leave-one out statistics #
-        TXE_no_dm, UX_no_dm, TX_no_dm = self.TXE, self.UX, TX
+        TXE_no_dm, UX_no_dm, DXE_no_dm, TX_no_dm = self.TXE, self.UX, self.DXE, TX
         TXE_no_dm[doc_z, x, e] += -1
         UX_no_dm[u, x] += -1
+        DXE_no_dm[d, x, e] += -1
         TX_no_dm[doc_z, x] += -1
 
         # calculate conditional probability #
@@ -325,8 +334,10 @@ class PRET(object):
         self.x[d][m] = x_new
         TXE_no_dm[doc_z, x_new, e] += 1
         UX_no_dm[u, x_new] += 1
+        DXE_no_dm[d, x_new, e] += 1
         TX_no_dm[doc_z, x_new] += 1
-        self.TXE, self.UX, TX = TXE_no_dm, UX_no_dm, TX_no_dm
+        self.TXE, self.UX, self.DXE, TX = TXE_no_dm, UX_no_dm, DXE_no_dm, TX_no_dm
+
         return TX
 
     def _estimateGlobal(self, dataDUE=None):
@@ -345,7 +356,14 @@ class PRET(object):
         log_ppl_e = - np.tensordot(self.TXE, np.log(self.eta), axes = ([0, 1, 2], [0, 1, 2])) / sum(self.Md)
         # ppl #
         log_ppl = log_ppl_w + log_ppl_e
-        return log_ppl_w, log_ppl_e, log_ppl, np.exp(log_ppl)
+        try:
+            ppl = np.exp(log_ppl)
+        except FloatingPointError as e:
+            if "overflow" in e.message:
+                ppl = np.nan
+            else:
+                raise e
+        return log_ppl_w, log_ppl_e, log_ppl, ppl
 
     def _saveCheckPoint(self, epoch, ppl = None, filename = None):
         if filename is None:

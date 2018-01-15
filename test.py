@@ -66,18 +66,25 @@ def do_someting(q):
             print "main_ended"
             break
 
-if __name__ == "__main__":
-    data_dir = "data/reactionsByPost_K10"
-    start = datetime.now()
-    # readfile(data_dir)
-    q = Queue(maxsize = 5000)
-    p = Process(target=readfileBatch, args = (q,))
-    # p2 = Process(target=do_someting, args = (q,))
-    p.start()
-    # p2.start()
-    do_someting(q)
-    p.join()
-    # p2.join()
-    end = datetime.now()
-    print "takes %f seconds" % (end-start).total_seconds()
+# if __name__ == "__main__":
+#     data_dir = "data/reactionsByPost_K10"
+#     start = datetime.now()
+#     # readfile(data_dir)
+#     q = Queue(maxsize = 5000)
+#     p = Process(target=readfileBatch, args = (q,))
+#     # p2 = Process(target=do_someting, args = (q,))
+#     p.start()
+#     # p2.start()
+#     do_someting(q)
+#     p.join()
+#     # p2.join()
+#     end = datetime.now()
+#     print "takes %f seconds" % (end-start).total_seconds()
 
+
+data_dir = "data/CNN_reactionsByPost_K10"
+post_ids = set([])
+for post_id in os.listdir(data_dir):
+    post_ids.add(post_id)
+with open("data/CNN_post_ids", "w") as f:
+    cPickle.dump(post_ids, f)
