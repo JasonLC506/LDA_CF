@@ -1,0 +1,207 @@
+for document 7300, with 1497 reactions, it takes 0.060000 s
+ # cal leave-one out: 0.010000 s, %0.166667 in total
+ # cal probability: 0.018000 s, %0.300000 in total
+ # cal new sample: 0.008000 s, %0.133333 in total
+ # cal update: 0.022000 s, %0.366667 in total
+
+for document 18900, with 895 reactions, it takes 0.037000 s
+ # cal leave-one out: 0.003000 s, %0.081081 in total
+ # cal probability: 0.012000 s, %0.324324 in total
+ # cal new sample: 0.002000 s, %0.054054 in total
+ # cal update: 0.018000 s, %0.486486 in total
+
+for document 21900, with 10280 reactions, it takes 0.429000 s
+ # cal leave-one out: 0.065000 s, %0.151515 in total
+ # cal probability: 0.135000 s, %0.314685 in total
+ # cal new sample: 0.054000 s, %0.125874 in total
+ # cal update: 0.155000 s, %0.361305 in total
+
+for document 100, with 7641 reactions, it takes 0.318000 s
+ # cal leave-one out: 0.039000 s, %0.122642 in total
+ # cal probability: 0.101000 s, %0.317610 in total
+ # cal new sample: 0.037000 s, %0.116352 in total
+ # cal update: 0.115000 s, %0.361635 in total
+
+for document 4500, with 3484 reactions, it takes 0.141000 s
+ # cal leave-one out: 0.019000 s, %0.134752 in total
+ # cal probability: 0.041000 s, %0.290780 in total
+ # cal new sample: 0.014000 s, %0.099291 in total
+ # cal update: 0.054000 s, %0.382979 in total
+
+for document 17500, with 558 reactions, it takes 0.022000 s
+ # cal leave-one out: 0.005000 s, %0.227273 in total
+ # cal probability: 0.006000 s, %0.272727 in total
+ # cal new sample: 0.003000 s, %0.136364 in total
+ # cal update: 0.007000 s, %0.318182 in total
+
+for document 14600, with 4318 reactions, it takes 0.175000 s
+ # cal leave-one out: 0.031000 s, %0.177143 in total
+ # cal probability: 0.052000 s, %0.297143 in total
+ # cal new sample: 0.021000 s, %0.120000 in total
+ # cal update: 0.062000 s, %0.354286 in total
+
+################################################################
+
+
+for document 7300, with 1497 reactions, it takes 0.060000 s
+ # cal leave-one out: 0.010000 s, %0.166667 in total
+ # cal probability: 0.019000 s, %0.316667 in total
+ # cal new sample: 0.009000 s, %0.150000 in total
+ # cal update: 0.019000 s, %0.316667 in total
+
+for document 18900, with 895 reactions, it takes 0.036000 s
+ # cal leave-one out: 0.003000 s, %0.083333 in total
+ # cal probability: 0.015000 s, %0.416667 in total
+ # cal new sample: 0.002000 s, %0.055556 in total
+ # cal update: 0.014000 s, %0.388889 in total
+
+for document 21900, with 10280 reactions, it takes 0.420000 s
+ # cal leave-one out: 0.066000 s, %0.157143 in total
+ # cal probability: 0.114000 s, %0.271429 in total
+ # cal new sample: 0.061000 s, %0.145238 in total
+ # cal update: 0.147000 s, %0.350000 in total
+
+for document 100, with 7641 reactions, it takes 0.320000 s
+ # cal leave-one out: 0.036000 s, %0.112500 in total
+ # cal probability: 0.101000 s, %0.315625 in total
+ # cal new sample: 0.039000 s, %0.121875 in total
+ # cal update: 0.120000 s, %0.375000 in total
+
+for document 4500, with 3484 reactions, it takes 0.148000 s
+ # cal leave-one out: 0.018000 s, %0.121622 in total
+ # cal probability: 0.044000 s, %0.297297 in total
+ # cal new sample: 0.018000 s, %0.121622 in total
+ # cal update: 0.058000 s, %0.391892 in total
+
+for document 17500, with 558 reactions, it takes 0.023000 s
+ # cal leave-one out: 0.005000 s, %0.217391 in total
+ # cal probability: 0.009000 s, %0.391304 in total
+ # cal new sample: 0.000000 s, %0.000000 in total
+ # cal update: 0.008000 s, %0.347826 in total
+
+for document 14600, with 4318 reactions, it takes 0.176000 s
+ # cal leave-one out: 0.024000 s, %0.136364 in total
+ # cal probability: 0.055000 s, %0.312500 in total
+ # cal new sample: 0.023000 s, %0.130682 in total
+ # cal update: 0.061000 s, %0.346591 in total
+
+for document 7300, with 1497 reactions, it takes 0.045000 s
+ # cal leave-one out: 0.007000 s, %0.155556 in total
+ # cal probability: 0.017000 s, %0.377778 in total
+ # cal new sample: 0.009000 s, %0.200000 in total
+ # cal update: 0.008000 s, %0.177778 in total
+
+for document 18900, with 895 reactions, it takes 0.027000 s
+ # cal leave-one out: 0.004000 s, %0.148148 in total
+ # cal probability: 0.010000 s, %0.370370 in total
+ # cal new sample: 0.003000 s, %0.111111 in total
+ # cal update: 0.006000 s, %0.222222 in total
+
+for document 21900, with 10280 reactions, it takes 0.305000 s
+ # cal leave-one out: 0.040000 s, %0.131148 in total
+ # cal probability: 0.134000 s, %0.439344 in total
+ # cal new sample: 0.054000 s, %0.177049 in total
+ # cal update: 0.053000 s, %0.173770 in total
+
+for document 100, with 7641 reactions, it takes 0.222000 s
+ # cal leave-one out: 0.035000 s, %0.157658 in total
+ # cal probability: 0.089000 s, %0.400901 in total
+ # cal new sample: 0.040000 s, %0.180180 in total
+ # cal update: 0.038000 s, %0.171171 in total
+
+for document 4500, with 3484 reactions, it takes 0.116000 s
+ # cal leave-one out: 0.013000 s, %0.112069 in total
+ # cal probability: 0.049000 s, %0.422414 in total
+ # cal new sample: 0.015000 s, %0.129310 in total
+ # cal update: 0.029000 s, %0.250000 in total
+
+for document 17500, with 558 reactions, it takes 0.018000 s
+ # cal leave-one out: 0.004000 s, %0.222222 in total
+ # cal probability: 0.006000 s, %0.333333 in total
+ # cal new sample: 0.002000 s, %0.111111 in total
+ # cal update: 0.002000 s, %0.111111 in total
+
+for document 14600, with 4318 reactions, it takes 0.127000 s
+ # cal leave-one out: 0.025000 s, %0.196850 in total
+ # cal probability: 0.046000 s, %0.362205 in total
+ # cal new sample: 0.017000 s, %0.133858 in total
+ # cal update: 0.027000 s, %0.212598 in total
+
+for document 1700, with 5305 reactions, it takes 0.157000 s
+ # cal leave-one out: 0.024000 s, %0.152866 in total
+ # cal probability: 0.067000 s, %0.426752 in total
+ # cal new sample: 0.020000 s, %0.127389 in total
+ # cal update: 0.028000 s, %0.178344 in total
+
+for document 23100, with 2515 reactions, it takes 0.076000 s
+ # cal leave-one out: 0.011000 s, %0.144737 in total
+ # cal probability: 0.038000 s, %0.500000 in total
+ # cal new sample: 0.013000 s, %0.171053 in total
+ # cal update: 0.008000 s, %0.105263 in total
+
+for document 22200, with 510 reactions, it takes 0.018000 s
+ # cal leave-one out: 0.004000 s, %0.222222 in total
+ # cal probability: 0.004000 s, %0.222222 in total
+ # cal new sample: 0.004000 s, %0.222222 in total
+ # cal update: 0.004000 s, %0.222222 in total
+
+for document 12200, with 1637 reactions, it takes 0.048000 s
+ # cal leave-one out: 0.009000 s, %0.187500 in total
+ # cal probability: 0.020000 s, %0.416667 in total
+ # cal new sample: 0.010000 s, %0.208333 in total
+ # cal update: 0.005000 s, %0.104167 in total
+
+for document 19300, with 15202 reactions, it takes 0.449000 s
+ # cal leave-one out: 0.055000 s, %0.122494 in total
+ # cal probability: 0.198000 s, %0.440980 in total
+ # cal new sample: 0.091000 s, %0.202673 in total
+ # cal update: 0.076000 s, %0.169265 in total
+
+for document 14900, with 34763 reactions, it takes 0.999000 s
+ # cal leave-one out: 0.169000 s, %0.169169 in total
+ # cal probability: 0.405000 s, %0.405405 in total
+ # cal new sample: 0.163000 s, %0.163163 in total
+ # cal update: 0.194000 s, %0.194194 in total
+
+for document 7300, with 1497 reactions, it takes 0.038000 s
+ # cal leave-one out: 0.008000 s, %0.210526 in total
+ # cal probability: 0.010000 s, %0.263158 in total
+ # cal new sample: 0.013000 s, %0.342105 in total
+ # cal update: 0.006000 s, %0.157895 in total
+
+for document 18900, with 895 reactions, it takes 0.022000 s
+ # cal leave-one out: 0.007000 s, %0.318182 in total
+ # cal probability: 0.003000 s, %0.136364 in total
+ # cal new sample: 0.006000 s, %0.272727 in total
+ # cal update: 0.002000 s, %0.090909 in total
+
+for document 21900, with 10280 reactions, it takes 0.263000 s
+ # cal leave-one out: 0.046000 s, %0.174905 in total
+ # cal probability: 0.059000 s, %0.224335 in total
+ # cal new sample: 0.079000 s, %0.300380 in total
+ # cal update: 0.058000 s, %0.220532 in total
+
+for document 100, with 7641 reactions, it takes 0.190000 s
+ # cal leave-one out: 0.043000 s, %0.226316 in total
+ # cal probability: 0.041000 s, %0.215789 in total
+ # cal new sample: 0.043000 s, %0.226316 in total
+ # cal update: 0.048000 s, %0.252632 in total
+
+for document 4500, with 3484 reactions, it takes 0.087000 s
+ # cal leave-one out: 0.017000 s, %0.195402 in total
+ # cal probability: 0.034000 s, %0.390805 in total
+ # cal new sample: 0.016000 s, %0.183908 in total
+ # cal update: 0.012000 s, %0.137931 in total
+
+for document 17500, with 558 reactions, it takes 0.014000 s
+ # cal leave-one out: 0.000000 s, %0.000000 in total
+ # cal probability: 0.007000 s, %0.500000 in total
+ # cal new sample: 0.002000 s, %0.142857 in total
+ # cal update: 0.003000 s, %0.214286 in total
+
+for document 14600, with 4318 reactions, it takes 0.105000 s
+ # cal leave-one out: 0.019000 s, %0.180952 in total
+ # cal probability: 0.031000 s, %0.295238 in total
+ # cal new sample: 0.033000 s, %0.314286 in total
+ # cal update: 0.015000 s, %0.142857 in total
+

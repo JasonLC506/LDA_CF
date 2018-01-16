@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.special import gamma, gammaln
+from scipy.special import gamma, gammaln, digamma
 from scipy.sparse import csr_matrix
 from datetime import datetime
 
@@ -27,6 +27,15 @@ def probNormalizeLog(distributions):
 
 def multinomial(prob, size=1):
     return np.argmax(np.random.multinomial(1, prob, size), axis=1)
+
+def multinomialSingleUnnorm(probability):
+    rnd = np.random.random() * np.sum(probability)
+    cpd = 0.0
+    for i in xrange(probability.shape[0]):
+        cpd += probability[i]
+        if rnd <= cpd:
+            return i
+    raise RuntimeError("multinomialSingleUnnorm failed with input %s" % str(probability))
 
 def multivariateBeta_inv(x):
     """
@@ -72,23 +81,12 @@ def logfactorialSparse(n_factors, start = np.array([[1,1],[1,1]])):
             result[v] = logfactorial(value, start[v])
         return result
 
-# def logfactorial2(n_factors, start = 1):
-#     """
-#     ! do not support array input !
-#     though a little bit faster with small n_factors,
-#     too slow when n_factors is large
-#     """
-#     factors = np.arange(n_factors, dtype=np.float32)
-#     factors += start
-#     return np.sum(np.log(factors))
+
+def EDirLog(par):
+    # E_{Dir(theta; par)}(log(theta))
+    return digamma(par) - digamma(np.sum(par, axis=-1, keepdims=True))
+
 
 if __name__ == "__main__":
-    b = csr_matrix(multinomial([0.999,0.0009,0.0001],20000).reshape([1,20000]))
-    a = np.random.random([20, 20000]) * 100
-    c = b + a
-    print c.shape, type(c)
-    # start = datetime.now()
-    # for i in range(1000):
-    #     r = logfactorialSparse(b, a)
-    # # print r
-    # print (datetime.now() - start).total_seconds()
+    par = np.ones([3,4,5])
+    print EDirLog(par)

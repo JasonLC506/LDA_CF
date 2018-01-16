@@ -3,8 +3,10 @@ from scipy.sparse import csr_matrix, lil_matrix
 import cPickle
 from datetime import datetime
 import time
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Pool, cpu_count
 import os
+
+from functions import *
 
 def doSomeThing(q):
     obj = q.get()
@@ -82,9 +84,75 @@ def do_someting(q):
 #     print "takes %f seconds" % (end-start).total_seconds()
 
 
-data_dir = "data/CNN_reactionsByPost_K10"
-post_ids = set([])
-for post_id in os.listdir(data_dir):
-    post_ids.add(post_id)
-with open("data/CNN_post_ids", "w") as f:
-    cPickle.dump(post_ids, f)
+# data_dir = "data/CNN_reactionsByPost_K10"
+# post_ids = set([])
+# for post_id in os.listdir(data_dir):
+#     post_ids.add(post_id)
+# with open("data/CNN_post_ids", "w") as f:
+#     cPickle.dump(post_ids, f)
+
+
+
+# c = [np.arange(i+1) for i in range(10000)]
+
+def multinomial_single(probability):
+    rnd = np.random.random()
+    cpd = 0.0
+    for i in xrange(probability.shape[0]):
+        cpd += probability[i]
+        if rnd <= cpd:
+            return i
+    return None
+
+def multinomial_single_unnorm(probability):
+    rnd = np.random.random() * np.sum(probability)
+    cpd = 0.0
+    for i in xrange(probability.shape[0]):
+        cpd += probability[i]
+        if rnd <= cpd:
+            return i
+    return None
+
+def f(x):
+    cnt = 0
+    for i in range(10000000/x/x):
+        cnt += 1
+    return x*x
+
+def batched_data(data_q, batch_size):
+    for i in xrange(batch_size):
+        yield data_q.get()
+
+def iteriter(N, batch_size, data_q):
+    N_batch = N / batch_size
+    if N % batch_size != 0:
+        N_batch += 1
+    for i_batch in xrange(N_batch):
+        if i_batch == N_batch-1:
+            batch_size_true = N % batch_size
+        else:
+            batch_size_true = batch_size
+        yield i_batch, batched_data(data_q, batch_size_true)
+
+if __name__ == "__main__":
+    q = Queue()
+    q.daemon = True
+    for i in range(10000):
+        q.put(i)
+    for i_batch, data_batched in iteriter(1000, 30, q):
+        print i_batch
+        for data_sample in data_batched:
+            print data_sample
+
+# if __name__ == "__main__":
+#     print cpu_count()
+#     pool = Pool(processes=3)
+#     # results = [pool.apply_async(f,(i,)) for i in range(1,10)]
+#     start = datetime.now()
+#     returned = pool.imap_unordered(f, xrange(1, 1000), chunksize=1)
+#     results = []
+#     for item in returned:
+#         results.append(item)
+#         # print item
+#     print len(set([res for res in results]))
+#     print (datetime.now() - start).total_seconds()

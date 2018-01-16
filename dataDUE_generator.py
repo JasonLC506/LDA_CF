@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 
 class dataDUELoader(object):
-    def __init__(self, meta_data_file, batch_data_dir, id_map, max_qsize = 5000, batch_size=1, random_shuffle=False):
+    def __init__(self, meta_data_file, batch_data_dir, id_map, dataToken=None, max_qsize = 5000, batch_size=1, random_shuffle=False):
 
         self.E = 0                                  # dimension of emotion
         self.U = 0                                  # number of users
@@ -28,6 +28,8 @@ class dataDUELoader(object):
 
         self.id_map = id_map                        # id_map between post_id and document_id
         self.batch_data_dir = batch_data_dir
+
+        self.dataToken = dataToken
 
         # for data generation, ! not implemented yet ! #
         # will modify self._dataBatchReader() #
@@ -53,7 +55,11 @@ class dataDUELoader(object):
                     if post_id not in self.id_map:
                         continue
                     document_id = self.id_map[post_id]
-                    data_queue.put([document_id, posts[post_id]], block=True, timeout=timeout)   # set max waiting time
+                    if self.dataToken is not None:
+                        data_queue.put([document_id, self.dataToken[document_id], posts[post_id]], block=True,
+                                       timeout=timeout)  # set max waiting time
+                    else:
+                        data_queue.put([document_id, posts[post_id]], block=True, timeout=timeout)   # set max waiting time
                 del posts
 
     def dataReaderTerminate(self):
@@ -64,6 +70,24 @@ class dataDUELoader(object):
             print "self.data_reader terminated"
         else:
             raise RuntimeError("self.data_reader cannot be terminated")
+
+    def batchGenerate(self, batch_size = 1):
+        N_batch = self.D / batch_size
+        incomplete_batch = False
+        if N_batch % batch_size != 0:
+            N_batch += 1
+            incomplete_batch = True
+        for i_batch in xrange(N_batch):
+            if i_batch == (N_batch - 1):
+                if incomplete_batch:
+                    batch_size_real = N_batch % batch_size
+            else:
+                batch_size_real = batch_size
+            yield i_batch, batch_size_real, self.generateSingleBatch(batch_size_real)
+
+    def generateSingleBatch(self, batch_size):
+        for i_samp in xrange(batch_size):
+            yield self.data_queue.get(block=True, timeout=100)
 
     def generate(self, timeout=100):
         # depends on inputs, yield [document_id, [[reader_id],[emoticon]]] #

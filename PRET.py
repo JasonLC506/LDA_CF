@@ -11,7 +11,7 @@ from datetime import timedelta
 from tqdm import tqdm
 import cPickle
 
-from functions import probNormalize, multinomial, logfactorial, probNormalizeLog, logfactorialSparse
+from functions import probNormalize, multinomial, logfactorial, probNormalizeLog, logfactorialSparse, multinomialSingleUnnorm
 from dataDUE_generator import dataDUELoader
 
 np.seterr(divide='raise', over='raise')
@@ -215,11 +215,29 @@ class PRET(object):
             for n in xrange(doc_Nd):
                 Y1T = self._y_update(d, n, doc_u, doc_e, docW, docToken, Y1T)
 
-            ## test ###
+            # ### test ###
+            # self.t_x = 0
+            # self.t_x_1 = 0
+            # self.t_x_2 = 0
+            # self.t_x_3 = 0
+            # self.t_x_4 = 0
+            # self.logfile = "log_PRET_profile"
+            # ############
             # update emoticon-level group #
             TX = np.sum(self.TXE, axis=-1)
+            # ### test ###
+            # start = datetime.now()
             for m in xrange(doc_Md):
                 TX = self._x_update(d, m, doc_u, doc_e, docW, docToken, TX)
+            # ### test ###
+            # duration = (datetime.now() - start).total_seconds()
+            # if d % 100 == 0:
+            #     with open(self.logfile, "a") as logf:
+            #         logf.write("for document %d, with %d reactions, it takes %f s\n" % (d, doc_Md, duration))
+            #         logf.write(" # cal leave-one out: %f s, %%%f in total\n" % (self.t_x_1, self.t_x_1 / duration))
+            #         logf.write(" # cal probability: %f s, %%%f in total\n" % (self.t_x_2, self.t_x_2 / duration))
+            #         logf.write(" # cal new sample: %f s, %%%f in total\n" % (self.t_x_3, self.t_x_3 / duration))
+            #         logf.write(" # cal update: %f s, %%%f in total\n\n" % (self.t_x_4, self.t_x_4 / duration))
 
     def _doc_z_update(self, d, doc_u, doc_e, docW, docToken):
         """ update document-level topic """
@@ -238,7 +256,7 @@ class PRET(object):
         prob_doc_z = self._prob_doc_z(TI_no_d, TXE_no_d, Y1TV_no_d, doc_XE, doc_Y1V)
 
         # new sampled result #
-        doc_z_new = multinomial(prob_doc_z)
+        doc_z_new = int(multinomial(prob_doc_z))
 
         # update #
         self.z[d] = doc_z_new
@@ -290,10 +308,11 @@ class PRET(object):
                              (self.V * self.beta + YI_no_dn_y[0])
         prob_w_y_unnorm[1] = (self.delta + YI_no_dn_y[1]) * (self.beta + Y1TV_no_dn_y[doc_z, w]) / \
                              (self.V * self.beta + Y1T_no_dn_y[doc_z])
-        prob_w_y = probNormalize(prob_w_y_unnorm)
+        # prob_w_y = probNormalize(prob_w_y_unnorm)
 
         # new sampled result #
-        w_y_new = multinomial(prob_w_y)
+        # w_y_new = int(multinomial(prob_w_y))
+        w_y_new = multinomialSingleUnnorm(prob_w_y_unnorm)
 
         # update #
         self.y[d][n] = w_y_new
@@ -309,11 +328,15 @@ class PRET(object):
         return Y1T
 
     def _x_update(self, d, m, doc_u, doc_e, docW, docToken, TX):
+
         """ update emoticon-level group indicator"""
         doc_z = self.z[d]
         u = doc_u[m]
         e = doc_e[m]
         x = self.x[d][m]
+
+        # ### test ###
+        # start = datetime.now()
 
         # calculate leave-one out statistics #
         TXE_no_dm, UX_no_dm, DXE_no_dm, TX_no_dm = self.TXE, self.UX, self.DXE, TX
@@ -322,13 +345,27 @@ class PRET(object):
         DXE_no_dm[d, x, e] += -1
         TX_no_dm[doc_z, x] += -1
 
+        # ### test ###
+        # end1 = datetime.now()
+        # self.t_x_1 += (end1 - start).total_seconds()
+
         # calculate conditional probability #
         prob_gamma = (self.gamma + TXE_no_dm[doc_z,:,e]) / (self.E * self.gamma + TX_no_dm[doc_z, :])
         prob_zeta = self.zeta + UX_no_dm[u, :]
-        prob_x = probNormalize(prob_gamma * prob_zeta)
+        # prob_x = probNormalize(prob_gamma * prob_zeta)
+        prob_x_unnorm = prob_gamma * prob_zeta
+
+        # ### test ###
+        # end2 = datetime.now()
+        # self.t_x_2 += (end2 - end1).total_seconds()
 
         # new sampled result #
-        x_new = multinomial(prob_x)
+        # x_new = int(multinomial(prob_x))
+        x_new = multinomialSingleUnnorm(prob_x_unnorm)
+
+        # ### test ###
+        # end3 = datetime.now()
+        # self.t_x_3 += (end3 - end2).total_seconds()
 
         # update #
         self.x[d][m] = x_new
@@ -336,7 +373,11 @@ class PRET(object):
         UX_no_dm[u, x_new] += 1
         DXE_no_dm[d, x_new, e] += 1
         TX_no_dm[doc_z, x_new] += 1
-        self.TXE, self.UX, self.DXE, TX = TXE_no_dm, UX_no_dm, DXE_no_dm, TX_no_dm
+        # self.TXE, self.UX, self.DXE, TX = TXE_no_dm, UX_no_dm, DXE_no_dm, TX_no_dm
+
+        # ### test ###
+        # end4 = datetime.now()
+        # self.t_x_4 += (end4 - end3).total_seconds()
 
         return TX
 
@@ -366,6 +407,8 @@ class PRET(object):
         return log_ppl_w, log_ppl_e, log_ppl, ppl
 
     def _saveCheckPoint(self, epoch, ppl = None, filename = None):
+        start = datetime.now()
+
         if filename is None:
             filename = self.checkpoint_file
         state = {
@@ -389,7 +432,12 @@ class PRET(object):
         with open(filename, "w") as f_ckpt:
             cPickle.dump(state, f_ckpt)
 
+        duration = datetime.now() - start
+        print "_saveCheckPoint takes %f s" % duration.total_seconds()
+
     def _restoreCheckPoint(self, filename=None):
+        start = datetime.now()
+
         if filename is None:
             filename = self.checkpoint_file
         state = cPickle.load(open(filename, "r"))
@@ -411,3 +459,6 @@ class PRET(object):
         epoch = state["epoch"]
         ppl = state["ppl"]
         print "restore state from file '%s' on epoch %d with ppl: %s" % (filename, epoch, str(ppl))
+
+        duration = datetime.now() - start
+        print "_restoreCheckPoint takes %f s" % duration.total_seconds()

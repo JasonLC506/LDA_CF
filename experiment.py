@@ -36,5 +36,5 @@ if __name__ == "__main__":
     training(dataW, batch_rBp_dir, dataToken=dataToken,
              Model=PRET, hyperparameters=[K, G],
              id_map_reverse = id_map_reverse,
-             resume = None)
+             resume = "ckpt/PRET")
 
