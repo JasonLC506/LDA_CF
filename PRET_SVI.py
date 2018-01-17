@@ -16,6 +16,8 @@ from tqdm import tqdm
 import cPickle
 import math
 from multiprocessing import Pool
+import warnings
+from copy import copy
 
 from dataDUE_generator import dataDUELoader
 from functions import EDirLog, probNormalize
@@ -25,8 +27,7 @@ np.seterr(divide='raise', over='raise')
 class latentVariableGlobal(object):
     def __init__(self):
         self.data = None                                        # np.ndarray
-        self.bigamma_data = None                                # EDirLog(self.data)
-
+        self.bigamma_data = None                                # EDirLog(self.data), diff of two digamma functions called bigamma
 
     def initialize(self, shape=None, new_data=None):
         if new_data is not None:
@@ -35,17 +36,16 @@ class latentVariableGlobal(object):
             self.data = (np.random.random(shape) + 3.0) / 300.0
         self.bigamma_data = EDirLog(self.data)
 
-
     def update(self, new_data, lr):
         self.data = self.data + lr * (new_data - self.data)     # update rule
         self.bigamma_data = EDirLog(self.data)
-
 
     def save_state(self):
         return self.data
 
     def restore_state(self, new_data):
         self.initialize(new_data)
+
 
 
 class PRET_SVI(object):
@@ -84,6 +84,9 @@ class PRET_SVI(object):
         # self.y = None                                           # word-level background-vs-topic indicator "[self.D, self.Nd, 2]"
         # self.x = None                                           # emoticon-level group indicator "[self.D, self.Md, self.G]"
 
+        # stochastic learning #
+        self.lr = None                                          # learning rate pars
+
         # save & store #
         self.checkpoint_file = "ckpt/PRET_SVI"
 
@@ -91,7 +94,7 @@ class PRET_SVI(object):
         self.pool = None
 
     def fit(self, dataDUE, dataW, corpus=None, alpha=0.1, beta=0.01, gamma=0.1, delta=0.01, zeta=0.1, max_iter=500, resume=None,
-            batch_size=1, N_workers=4):
+            batch_size=1, N_workers=4, lr_tau=1, lr_kappa=0.9, lr_init=0.1):
         """
         stochastic variational inference
         :param dataDUE: data generator for each document id, generate [[reader_id], [emoticon]]
@@ -104,6 +107,8 @@ class PRET_SVI(object):
             dataToken = corpus
 
         self._setDataDimension(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken)
+
+        self.lr = {"tau": lr_tau, "kappa": lr_kappa, "init": lr_init}
 
         if resume is None:
             self._initialize(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken)
@@ -176,13 +181,14 @@ class PRET_SVI(object):
         pbar = tqdm(dataDUE.batchGenerate(batch_size=batch_size),
                     total = math.ceil(self.D * 1.0 / batch_size),
                     desc = '({0:^3})'.format(epoch))
-        for i_batch, batch_size, data_batched in pbar:
+        for i_batch, batch_size_real, data_batched in pbar:
             local_pars = []
             var_temp = self._fit_batchIntermediateInitialize()
             returned_cursor = self.pool.imap(self._fit_single_document, data_batched)
             for returned in returned_cursor:
-                var_temp = self._fit_single_document_cumulate(returned, var_temp)
-                pass                                ### ! ongoing
+                var_temp = self._fit_single_batch_cumulate(returned, var_temp)
+
+            self._fit_single_batch_global_update(var_temp, batch_size_real, epoch)
 
 
     def _fit_batchIntermediateInitialize(self):
@@ -196,18 +202,61 @@ class PRET_SVI(object):
         }
         return vars
 
-    def _fit_single_document(self, docdata):
+    def _fit_single_document(self, docdata, max_iter_inner=500):
         """
         alternative optimization for local parameters for single document
         :return: [d, doc_z, doc_YI, doc_Y0V, doc_UX, doc_Y1zV, doc_zXE]
         """
         d, docToken, [doc_u, doc_e] = docdata
-        pass                                        ### ! on going
+        doc_z = self.z[d]
+        doc_Nd = self.Nd[d]
+        doc_Md = self.Md[d]
+        doc_x_old = np.zeros([doc_Md, self.G])
+        doc_y_old = np.zeros([doc_Nd, 2])
+        doc_z_old = doc_z
+        for inner_iter in xrange(max_iter_inner):
+            doc_y = self._fit_single_document_y_update(doc_z, docToken)
+            doc_x = self._fit_single_document_x_update(doc_z, doc_u, doc_e)
+            doc_z = self._fit_single_document_z_update(doc_y, doc_x, docToken, doc_e)
+            doc_x_old, doc_y_old, doc_z_old, converge_flag = self._fit_single_document_convergeCheck(
+                                                                    doc_x, doc_y, doc_z, doc_x_old, doc_y_old, doc_z_old
+            )
+            if converge_flag:
+                return self._fit_single_document_return(doc_x, doc_y, doc_z, docToken, doc_u, doc_e)
+        warnings.warn("Runtime warning: %d document not converged after %d" % (d, max_iter_inner))
+        return self._fit_single_document_return(doc_x, doc_y, doc_z, docToken, doc_u, doc_e)
 
-    def _fit_single_document_cumulate(self, returned_fit_single_document, var_temp):
+    def _fit_single_batch_cumulate(self, returned_fit_single_document, var_temp):
         d, doc_z, doc_YI, doc_Y0V, doc_UX, doc_Y1zV, doc_zXE = returned_fit_single_document  # parse returned from self._fit_single_document
-        self.z[d] = doc_z                                                                    # update document-level topic
-        pass                                        ### ! on going
+
+        # update document-level topic #
+        self.z[d] = doc_z
+
+        var_temp["TI"][doc_z] += 1
+        var_temp["YI"] += doc_YI
+        var_temp["Y0V"] += doc_Y0V
+        var_temp["UX"] += doc_UX
+        var_temp["Y1TV"][doc_z, :] += doc_Y1zV
+        var_temp["TXE"][doc_z, :, :] += doc_zXE
+
+    def _fit_single_batch_global_update(self, var_temp, batch_size_real, epoch):
+        lr = self._lrCal(epoch)
+        batch_weight = self.D * 1.0 / batch_size_real
+        new_theta_temp = self.alpha + batch_weight * var_temp["TI"]
+        new_pi_temp = self.delta + batch_weight * var_temp["YI"]
+        new_phiB_temp = self.beta + batch_weight * var_temp["Y0V"]
+        new_phiT_temp = self.beta + batch_weight * var_temp["Y1TV"]
+        new_psi_temp = self.zeta + batch_weight * var_temp["UX"]
+        new_eta_temp = self.gamma + batch_weight * var_temp["TXE"]
+        self.theta.update(new_theta_temp, lr)
+        self.pi.update(new_pi_temp, lr)
+        self.phiB.update(new_phiB_temp, lr)
+        self.phiT.update(new_phiT_temp, lr)
+        self.psi.update(new_psi_temp, lr)
+        self.eta.update(new_eta_temp, lr)
+
+    def _lrCal(self, epoch):
+        return float(self.lr["init"] * np.power((self.lr["tau"] + epoch), - self.lr["kappa"]))
 
     def _saveCheckPoint(self, epoch, ppl = None, filename = None):
         start = datetime.now()
