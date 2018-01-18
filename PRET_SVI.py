@@ -18,11 +18,15 @@ import math
 from multiprocessing import Pool
 import warnings
 from copy import copy
+import itertools
 
 from dataDUE_generator import dataDUELoader
-from functions import EDirLog, probNormalize
+from functions import EDirLog, probNormalize, probNormalizeLog
+from PRET_SVI_functions import _fit_single_document
 
 np.seterr(divide='raise', over='raise')
+
+tqdm.monitor_interval = 0                                       # workaround tqdm RuntimeError: Set changed size during iteration
 
 class latentVariableGlobal(object):
     def __init__(self):
@@ -45,7 +49,6 @@ class latentVariableGlobal(object):
 
     def restore_state(self, new_data):
         self.initialize(new_data)
-
 
 
 class PRET_SVI(object):
@@ -84,6 +87,9 @@ class PRET_SVI(object):
         # self.y = None                                           # word-level background-vs-topic indicator "[self.D, self.Nd, 2]"
         # self.x = None                                           # emoticon-level group indicator "[self.D, self.Md, self.G]"
 
+        # model global latent variables point estimate #
+        self.GLV = {"theta": None, "pi": None, "eta": None, "phiB": None, "phiT": None, "psi": None}
+
         # stochastic learning #
         self.lr = None                                          # learning rate pars
 
@@ -94,7 +100,7 @@ class PRET_SVI(object):
         self.pool = None
 
     def fit(self, dataDUE, dataW, corpus=None, alpha=0.1, beta=0.01, gamma=0.1, delta=0.01, zeta=0.1, max_iter=500, resume=None,
-            batch_size=1, N_workers=4, lr_tau=1, lr_kappa=0.9, lr_init=0.1):
+            batch_size=128, N_workers=4, lr_tau=1, lr_kappa=0.9, lr_init=0.1, converge_threshold_inner=0.01):
         """
         stochastic variational inference
         :param dataDUE: data generator for each document id, generate [[reader_id], [emoticon]]
@@ -109,6 +115,7 @@ class PRET_SVI(object):
         self._setDataDimension(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken)
 
         self.lr = {"tau": lr_tau, "kappa": lr_kappa, "init": lr_init}
+        self.converge_threshold_inner = converge_threshold_inner            # inner iteration for each document
 
         if resume is None:
             self._initialize(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken)
@@ -119,12 +126,14 @@ class PRET_SVI(object):
         # set up multiprocessing pool #
         self.pool = Pool(processes=N_workers)
 
-        ppl_initial = self._ppl(dataDUE, dataW=dataW, dataToken=dataToken)
+        self._estimateGlobal()
+        ppl_initial = self._ppl(dataDUE, dataW=dataW, dataToken=dataToken, epoch=-1)
         print "before training, ppl: %s" % str(ppl_initial)
 
         for epoch in range(max_iter):
             self._fit_single_epoch(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken, epoch=epoch, batch_size=batch_size)
-            ppl = self._ppl(dataDUE, dataW=dataW, dataToken=dataToken)
+            self._estimateGlobal()
+            ppl = self._ppl(dataDUE, dataW=dataW, dataToken=dataToken, epoch=epoch)
             print "epoch: %d, ppl: %s" % (epoch, str(ppl))
             self._saveCheckPoint(epoch, ppl)
 
@@ -162,6 +171,9 @@ class PRET_SVI(object):
         self.V = dataW.shape[1]
 
     def _initialize(self, dataDUE, dataW, dataToken):
+        start = datetime.now()
+        print "start _initialize"
+
         self.z = probNormalize(np.random.random([self.D, self.K]))
         # self.y = []
         # self.x = []
@@ -176,22 +188,139 @@ class PRET_SVI(object):
         self.psi.initialize(shape=[self.U, self.G])
         self.eta.initialize(shape=[self.K, self.G, self.E])
 
+        duration = (datetime.now() - start).total_seconds()
+        print "_initialize takes %fs" % duration
+
+    def _estimateGlobal(self):
+        """
+        give point estimate of global latent variables, self.GLV
+        current: mean
+        """
+        self.GLV["theta"] = probNormalize(self.theta.data)
+        self.GLV["pi"] = probNormalize(self.pi.data)
+        self.GLV["psi"] = probNormalize(self.psi.data)
+        self.GLV["phiB"] = probNormalize(self.phiB.data)
+        self.GLV["phiT"] = probNormalize(self.phiT.data)
+        self.GLV["eta"] = probNormalize(self.eta.data)
+
     def _fit_single_epoch(self, dataDUE, dataW, dataToken, epoch, batch_size):
+        print "start _fit_single_epoch"
+
         # uniformly sampling all documents once #
         pbar = tqdm(dataDUE.batchGenerate(batch_size=batch_size),
                     total = math.ceil(self.D * 1.0 / batch_size),
                     desc = '({0:^3})'.format(epoch))
         for i_batch, batch_size_real, data_batched in pbar:
-            local_pars = []
+            # start = datetime.now()                                          ###
+
             var_temp = self._fit_batchIntermediateInitialize()
-            returned_cursor = self.pool.imap(self._fit_single_document, data_batched)
-            for returned in returned_cursor:
+
+            # end1 = datetime.now()   ###
+            # print "_fit_batchIntermediateInitialize takes %fs" % (end1 - start).total_seconds()###
+
+            pars_topass = self._fit_single_epoch_pars_topass()
+
+            # end2 = datetime.now()###
+            # print "_fit_single_epoch_pars_topass takes %fs" % (end2 - end1).total_seconds()###
+
+            data_batched_topass = itertools.imap(lambda x: x + [pars_topass], data_batched)
+
+            ### test ###
+            # returned_cursor = self.pool.imap_unordered(_fit_single_document, data_batched_topass)
+            # for returned in returned_cursor:
+            for data_batched_sample in data_batched_topass:
+                # start_single_doc = datetime.now()
+                returned = _fit_single_document(data_batched_sample)
+                # end1_single_doc = datetime.now()
+                # duration_single_doc = (end1_single_doc - start_single_doc).total_seconds()
+                # print "_fit_single_document takes %fs" % duration_single_doc
+
                 var_temp = self._fit_single_batch_cumulate(returned, var_temp)
+                # self._fit_single_batch_cumulate(returned, var_temp)###
+
+                # duration_single_doc_2 = (datetime.now() - end1_single_doc).total_seconds()
+                # print "_fit_single_batch_cumulate takes %fs" % duration_single_doc_2
+
+            # end3 = datetime.now()###
+            # print "batch doc update %fs" % (end3 - end2).total_seconds()###
 
             self._fit_single_batch_global_update(var_temp, batch_size_real, epoch)
 
+            # end4 = datetime.now()###
+            # print "_fit_single_batch_global_update takes %fs" % (end4 - end3).total_seconds()###
+
+    def _fit_single_epoch_pars_topass(self):
+        ans = vars(self)
+        pars_topass = {}
+        for name in ans:
+            if name == "pool":
+                continue
+            if name == "GLV":
+                continue
+            pars_topass[name] = ans[name]
+        return pars_topass
+
+    def _ppl(self, dataDUE, dataW, dataToken, epoch=-1):
+        start = datetime.now()
+        print "start _ppl"
+
+        ppl_w_log = 0
+        ppl_e_log = 0
+        ppl_log = 0
+        pbar = tqdm(dataDUE.generate(),
+                    total=self.D,
+                    desc = '{}'.format("_ppl"))
+        for docdata in pbar:
+            try:
+                doc_ppl_log = self._ppl_log_single_document(docdata)
+            except FloatingPointError as e:
+                print "encounting underflow problem, no need to continue"
+                return np.nan, np.nan, np.nan
+            ppl_w_log += doc_ppl_log[0]
+            ppl_e_log += doc_ppl_log[1]
+            ppl_log += doc_ppl_log[2]
+        # normalize #
+        ppl_w_log /= (sum(self.Nd))
+        ppl_e_log /= (sum(self.Md))
+        ppl_log /= self.D
+
+        duration = (datetime.now() - start).total_seconds()
+        print "_ppl takes %fs" % duration
+
+        return ppl_w_log, ppl_e_log, ppl_log                                # word & emoti not separable
+
+    def _ppl_log_single_document(self, docdata):            ### potential underflow problem
+        d, docToken, [doc_u, doc_e] = docdata
+        prob_w_kv = (self.GLV["phiT"] * self.GLV["pi"][1] + self.GLV["phiB"] * self.GLV["pi"][0])
+        ppl_w_k_log = -np.sum(np.log(prob_w_kv[:, docToken]), axis=1)
+        prob_e_mke = np.dot(self.GLV["psi"][doc_u, :], self.GLV["eta"])
+        ppl_e_k_log = - np.sum(np.log(prob_e_mke[np.arange(doc_u.shape[0]), :, doc_e]), axis=0)
+        prob_k = self.GLV["theta"]
+
+        ### ! on going ###
+        # for emoti given words
+        prob_e_m =  probNormalize(np.tensordot(prob_e_mke, np.multiply(prob_k, ppl_w_k), axes=(1,0)))
+        ppl_e_log = - np.sum(np.log(prob_e_m[np.arange(doc_u.shape[0]), doc_e]))
+        # for words given emoti
+        prob_w = probNormalize(np.tensordot(prob_w_kv, np.multiply(prob_k, ppl_e_k), axes=(0,0)))
+        ppl_w_log = - np.sum(np.log(prob_w[docToken]))
+        # for both words & emoti
+        try:
+            ppl_log = - np.log(np.inner(ppl_w_k, np.multiply(ppl_e_k, prob_k)))
+        except FloatingPointError as e:
+            # print "prob_k"
+            # print prob_k
+            print "ppl_e_k"
+            print ppl_e_k
+            # print "ppl_w_k"
+            # print ppl_w_k
+            # print "GLV"
+            # print self.GLV
+            raise e
+        return ppl_w_log, ppl_e_log, ppl_log
 
     def _fit_batchIntermediateInitialize(self):
+        # instantiate vars every loop #
         vars = {
             "TI": np.zeros(self.K, dtype=np.float64),
             "YI": np.zeros(2, dtype=np.float64),
@@ -202,42 +331,44 @@ class PRET_SVI(object):
         }
         return vars
 
-    def _fit_single_document(self, docdata, max_iter_inner=500):
-        """
-        alternative optimization for local parameters for single document
-        :return: [d, doc_z, doc_YI, doc_Y0V, doc_UX, doc_Y1zV, doc_zXE]
-        """
-        d, docToken, [doc_u, doc_e] = docdata
-        doc_z = self.z[d]
-        doc_Nd = self.Nd[d]
-        doc_Md = self.Md[d]
-        doc_x_old = np.zeros([doc_Md, self.G])
-        doc_y_old = np.zeros([doc_Nd, 2])
-        doc_z_old = doc_z
-        for inner_iter in xrange(max_iter_inner):
-            doc_y = self._fit_single_document_y_update(doc_z, docToken)
-            doc_x = self._fit_single_document_x_update(doc_z, doc_u, doc_e)
-            doc_z = self._fit_single_document_z_update(doc_y, doc_x, docToken, doc_e)
-            doc_x_old, doc_y_old, doc_z_old, converge_flag = self._fit_single_document_convergeCheck(
-                                                                    doc_x, doc_y, doc_z, doc_x_old, doc_y_old, doc_z_old
-            )
-            if converge_flag:
-                return self._fit_single_document_return(doc_x, doc_y, doc_z, docToken, doc_u, doc_e)
-        warnings.warn("Runtime warning: %d document not converged after %d" % (d, max_iter_inner))
-        return self._fit_single_document_return(doc_x, doc_y, doc_z, docToken, doc_u, doc_e)
-
     def _fit_single_batch_cumulate(self, returned_fit_single_document, var_temp):
-        d, doc_z, doc_YI, doc_Y0V, doc_UX, doc_Y1zV, doc_zXE = returned_fit_single_document  # parse returned from self._fit_single_document
+        # ends = []
+        # ends.append(datetime.now())###
+        # print "#### start _fit_single_batch_cumulate ####"
+
+        d, doc_z, doc_YI, doc_Y0V, doc_u, doc_x, doc_Y1TV, doc_TXE = returned_fit_single_document  # parse returned from self._fit_single_document
+
+        # ends.append(datetime.now())###
 
         # update document-level topic #
-        self.z[d] = doc_z
+        self.z[d, :] = doc_z[:]
 
-        var_temp["TI"][doc_z] += 1
+        var_temp["TI"] += doc_z
+
+        # ends.append(datetime.now())###
+
         var_temp["YI"] += doc_YI
+
+        # ends.append(datetime.now())###
+
         var_temp["Y0V"] += doc_Y0V
-        var_temp["UX"] += doc_UX
-        var_temp["Y1TV"][doc_z, :] += doc_Y1zV
-        var_temp["TXE"][doc_z, :, :] += doc_zXE
+
+        # ends.append(datetime.now()) ###
+
+        # var_temp["UX"] += doc_UX    # too sparse
+        var_temp["UX"][doc_u, :] += doc_x
+
+        # ends.append(datetime.now()) ###
+
+        var_temp["Y1TV"] += doc_Y1TV
+
+        # ends.append(datetime.now()) ###
+
+        var_temp["TXE"] += doc_TXE
+
+        # print "#### _fit_single_batch_cumulate detail profile: read, z, YI, Y0V, UX, Y1TV, TXE: ", [(ends[i]-ends[i-1]).total_seconds() for i in range(1, len(ends))]###
+
+        return var_temp
 
     def _fit_single_batch_global_update(self, var_temp, batch_size_real, epoch):
         lr = self._lrCal(epoch)
@@ -315,4 +446,10 @@ class PRET_SVI(object):
         duration = datetime.now() - start
         print "_restoreCheckPoint takes %f s" % duration.total_seconds()
 
+
+if __name__ == "__main__":
+    model = PRET_SVI(2,1)
+    ans = vars(model)
+    print type(ans)
+    print ans
 

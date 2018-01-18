@@ -2,6 +2,7 @@ import numpy as np
 from scipy.special import gamma, gammaln, digamma
 from scipy.sparse import csr_matrix
 from datetime import datetime
+import warnings
 
 np.seterr(over="raise")
 
@@ -35,7 +36,9 @@ def multinomialSingleUnnorm(probability):
         cpd += probability[i]
         if rnd <= cpd:
             return i
-    raise RuntimeError("multinomialSingleUnnorm failed with input %s" % str(probability))
+    # raise RuntimeError("multinomialSingleUnnorm failed with input %s, rnd %f" % (str(probability), rnd))
+    warnings.warn("multinomialSingleUnnorm failed with input %s, rnd %f" % (str(probability), float(rnd)))
+    return probability.shape[0] - 1
 
 def multivariateBeta_inv(x):
     """

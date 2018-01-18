@@ -5,6 +5,9 @@ from datetime import datetime
 import time
 from multiprocessing import Process, Queue, Pool, cpu_count
 import os
+from matplotlib import pyplot as plt
+import itertools
+from tqdm import tqdm
 
 from functions import *
 
@@ -113,36 +116,38 @@ def multinomial_single_unnorm(probability):
             return i
     return None
 
-def f(x):
+def f(data):
+    x,b = data
     cnt = 0
     for i in range(10000000/x/x):
-        cnt += 1
-    return x*x
+        cnt += np.sqrt(b)
 
-def batched_data(data_q, batch_size):
-    for i in xrange(batch_size):
-        yield data_q.get()
+    return x*x+b
 
-def iteriter(N, batch_size, data_q):
-    N_batch = N / batch_size
-    if N % batch_size != 0:
-        N_batch += 1
-    for i_batch in xrange(N_batch):
-        if i_batch == N_batch-1:
-            batch_size_true = N % batch_size
-        else:
-            batch_size_true = batch_size
-        yield i_batch, batched_data(data_q, batch_size_true)
-
-if __name__ == "__main__":
-    q = Queue()
-    q.daemon = True
-    for i in range(10000):
-        q.put(i)
-    for i_batch, data_batched in iteriter(1000, 30, q):
-        print i_batch
-        for data_sample in data_batched:
-            print data_sample
+# def batched_data(data_q, batch_size):
+#     for i in xrange(batch_size):
+#         yield data_q.get()
+#
+# def iteriter(N, batch_size, data_q):
+#     N_batch = N / batch_size
+#     if N % batch_size != 0:
+#         N_batch += 1
+#     for i_batch in xrange(N_batch):
+#         if i_batch == N_batch-1:
+#             batch_size_true = N % batch_size
+#         else:
+#             batch_size_true = batch_size
+#         yield i_batch, batched_data(data_q, batch_size_true)
+#
+# if __name__ == "__main__":
+#     q = Queue()
+#     q.daemon = True
+#     for i in range(10000):
+#         q.put(i)
+#     for i_batch, data_batched in iteriter(1000, 30, q):
+#         print i_batch
+#         for data_sample in data_batched:
+#             print data_sample
 
 # if __name__ == "__main__":
 #     print cpu_count()
@@ -156,3 +161,28 @@ if __name__ == "__main__":
 #         # print item
 #     print len(set([res for res in results]))
 #     print (datetime.now() - start).total_seconds()
+
+class A(object):
+    def __init__(self):
+        self.a = 0
+        self.b = [1, 2]
+
+    def varsChange(self):
+        ans = vars(self)
+        print type(ans), ans["b"], type(ans["b"])
+        del ans["b"]
+
+def objGenerate(N):
+    for i in xrange(N):
+        yield [i+1,2]
+
+def iterGenerate(N):
+    for i in xrange(N):
+        yield objGenerate(N)
+
+if __name__ == "__main__":
+    a = np.zeros([5,3])
+    b = np.array([1,2,3])
+    c = np.ones([3,3])
+    a[b,:] += c
+    print a

@@ -56,7 +56,7 @@ class dataDUELoader(object):
                         continue
                     document_id = self.id_map[post_id]
                     if self.dataToken is not None:
-                        data_queue.put([document_id, self.dataToken[document_id], posts[post_id]], block=True,
+                        data_queue.put([document_id, np.array(self.dataToken[document_id], dtype=np.int64), map(np.array, posts[post_id])], block=True,
                                        timeout=timeout)  # set max waiting time
                     else:
                         data_queue.put([document_id, posts[post_id]], block=True, timeout=timeout)   # set max waiting time
