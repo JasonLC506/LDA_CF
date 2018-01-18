@@ -11,7 +11,7 @@ from datetime import timedelta
 from tqdm import tqdm
 import cPickle
 
-from functions import probNormalize, multinomial, logfactorial, probNormalizeLog, logfactorialSparse, multinomialSingleUnnorm
+from functions import probNormalize, multinomial, logfactorial, probNormalizeLog, expConstantIgnore, logfactorialSparse, multinomialSingleUnnorm
 from dataDUE_generator import dataDUELoader
 
 np.seterr(divide='raise', over='raise')
@@ -389,22 +389,77 @@ class PRET(object):
         self.eta = probNormalize(self.TXE + self.gamma)
         self.psi = probNormalize(self.UX + self.zeta)
 
-    def _ppl(self, dataDUE, dataW, dataToken):
-        # ppl for word #
-        log_ppl_w = - (np.inner(self.Y0V, np.log(self.phiB)) +
-                       np.tensordot(self.Y1TV, np.log(self.phiT), axes=([0, 1], [0, 1]))) / sum(self.Nd)
-        # ppl for emoticons #
-        log_ppl_e = - np.tensordot(self.TXE, np.log(self.eta), axes = ([0, 1, 2], [0, 1, 2])) / sum(self.Md)
-        # ppl #
-        log_ppl = log_ppl_w + log_ppl_e
+    # def _ppl(self, dataDUE, dataW, dataToken):
+    #     # ppl for word #
+    #     log_ppl_w = - (np.inner(self.Y0V, np.log(self.phiB)) +
+    #                    np.tensordot(self.Y1TV, np.log(self.phiT), axes=([0, 1], [0, 1]))) / sum(self.Nd)
+    #     # ppl for emoticons #
+    #     log_ppl_e = - np.tensordot(self.TXE, np.log(self.eta), axes = ([0, 1, 2], [0, 1, 2])) / sum(self.Md)
+    #     # ppl #
+    #     log_ppl = log_ppl_w + log_ppl_e
+    #     try:
+    #         ppl = np.exp(log_ppl)
+    #     except FloatingPointError as e:
+    #         if "overflow" in e.message:
+    #             ppl = np.nan
+    #         else:
+    #             raise e
+    #     return log_ppl_w, log_ppl_e, log_ppl, ppl
+
+    def _ppl(self, dataDUE, dataW, dataToken, epoch=-1):
+        start = datetime.now()
+        print "start _ppl"
+
+        ppl_w_log = 0
+        ppl_e_log = 0
+        ppl_log = 0
+        pbar = tqdm(dataDUE.generate(),
+                    total=self.D,
+                    desc = '{}'.format("_ppl"))
+        for docdata in pbar:
+            try:
+                doc_ppl_log = self._ppl_log_single_document(docdata)
+            except FloatingPointError as e:
+                print "encounting underflow problem, no need to continue"
+                return np.nan, np.nan, np.nan
+            ppl_w_log += doc_ppl_log[0]
+            ppl_e_log += doc_ppl_log[1]
+            ppl_log += doc_ppl_log[2]
+        # normalize #
+        ppl_w_log /= (sum(self.Nd))
+        ppl_e_log /= (sum(self.Md))
+        ppl_log /= self.D
+
+        duration = (datetime.now() - start).total_seconds()
+        print "_ppl takes %fs" % duration
+
+        return ppl_w_log, ppl_e_log, ppl_log                                # word & emoti not separable
+
+    def _ppl_log_single_document(self, docdata):            ### potential underflow problem
+        d, docToken, [doc_u, doc_e] = docdata
+        prob_w_kv = (self.phiT * self.pi[1] + self.phiB * self.pi[0])
+        ppl_w_k_log = -np.sum(np.log(prob_w_kv[:, docToken]), axis=1)
+        ppl_w_k_scaled, ppl_w_k_constant = expConstantIgnore(- ppl_w_k_log, constant_output=True) # (actual ppl^(-1))
+
+        prob_e_mk = np.dot(self.psi[doc_u, :], self.eta)
+        ppl_e_k_log = - np.sum(np.log(prob_e_mk[np.arange(doc_u.shape[0]), :, doc_e]), axis=0)
+        ppl_e_k_scaled, ppl_e_k_constant = expConstantIgnore(- ppl_e_k_log, constant_output=True) # (actual ppl^(-1))
+        prob_k = self.theta
+
+
+        # for emoti given words
+        prob_e_m =  probNormalize(np.tensordot(prob_e_mk, np.multiply(prob_k, ppl_w_k_scaled), axes=(1,0)))
+        ppl_e_log = - np.sum(np.log(prob_e_m[np.arange(doc_u.shape[0]), doc_e]))
+        # for words given emoti ! same prob_w for different n
+        prob_w = probNormalize(np.tensordot(prob_w_kv, np.multiply(prob_k, ppl_e_k_scaled), axes=(0,0)))
+        ppl_w_log = - np.sum(np.log(prob_w[docToken]))
+        # for both words & emoti
         try:
-            ppl = np.exp(log_ppl)
+            ppl_log = - (np.log(np.inner(ppl_w_k_scaled, np.multiply(ppl_e_k_scaled, prob_k)))
+                         + ppl_w_k_constant + ppl_e_k_constant)
         except FloatingPointError as e:
-            if "overflow" in e.message:
-                ppl = np.nan
-            else:
-                raise e
-        return log_ppl_w, log_ppl_e, log_ppl, ppl
+            raise e
+        return ppl_w_log, ppl_e_log, ppl_log
 
     def _saveCheckPoint(self, epoch, ppl = None, filename = None):
         start = datetime.now()

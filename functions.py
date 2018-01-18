@@ -14,17 +14,30 @@ def probNormalize(distributions):
 
 def probNormalizeLog(distributions):
     """ from log unnormalized distribution to normalized distribution """
-    if distributions.ndim > 1:
-        distributions = distributions - np.max(distributions, axis=-1,keepdims=True)
-    else:
-        distributions = distributions - np.max(distributions)
     try:
-        prob = probNormalize(np.exp(distributions))
+        prob = probNormalize(expConstantIgnore(distributions))
     except FloatingPointError, e:
         print distributions
         print np.max(distributions), np.min(distributions)
         raise e
     return prob
+
+def expConstantIgnore(log_array, constant_output = False):
+    if log_array.ndim > 1:
+        constant = np.max(log_array, axis=-1,keepdims=True)
+        log_array = log_array - constant
+    else:
+        constant = np.max(log_array)
+        log_array = log_array - constant
+    try:
+        array = np.exp(log_array)
+    except FloatingPointError as e:
+        print log_array
+        print np.max(log_array), np.min(log_array)
+        raise e
+    if constant_output:
+        return array, log_array
+    return array
 
 def multinomial(prob, size=1):
     return np.argmax(np.random.multinomial(1, prob, size), axis=1)

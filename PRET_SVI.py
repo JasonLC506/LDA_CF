@@ -21,7 +21,7 @@ from copy import copy
 import itertools
 
 from dataDUE_generator import dataDUELoader
-from functions import EDirLog, probNormalize, probNormalizeLog
+from functions import EDirLog, probNormalize, probNormalizeLog, expConstantIgnore
 from PRET_SVI_functions import _fit_single_document
 
 np.seterr(divide='raise', over='raise')
@@ -293,29 +293,25 @@ class PRET_SVI(object):
         d, docToken, [doc_u, doc_e] = docdata
         prob_w_kv = (self.GLV["phiT"] * self.GLV["pi"][1] + self.GLV["phiB"] * self.GLV["pi"][0])
         ppl_w_k_log = -np.sum(np.log(prob_w_kv[:, docToken]), axis=1)
-        prob_e_mke = np.dot(self.GLV["psi"][doc_u, :], self.GLV["eta"])
-        ppl_e_k_log = - np.sum(np.log(prob_e_mke[np.arange(doc_u.shape[0]), :, doc_e]), axis=0)
+        ppl_w_k_scaled, ppl_w_k_constant = expConstantIgnore(- ppl_w_k_log, constant_output=True) # (actual ppl^(-1))
+
+        prob_e_mk = np.dot(self.GLV["psi"][doc_u, :], self.GLV["eta"])
+        ppl_e_k_log = - np.sum(np.log(prob_e_mk[np.arange(doc_u.shape[0]), :, doc_e]), axis=0)
+        ppl_e_k_scaled, ppl_e_k_constant = expConstantIgnore(- ppl_e_k_log, constant_output=True) # (actual ppl^(-1))
         prob_k = self.GLV["theta"]
 
-        ### ! on going ###
+
         # for emoti given words
-        prob_e_m =  probNormalize(np.tensordot(prob_e_mke, np.multiply(prob_k, ppl_w_k), axes=(1,0)))
+        prob_e_m =  probNormalize(np.tensordot(prob_e_mk, np.multiply(prob_k, ppl_w_k_scaled), axes=(1,0)))
         ppl_e_log = - np.sum(np.log(prob_e_m[np.arange(doc_u.shape[0]), doc_e]))
-        # for words given emoti
-        prob_w = probNormalize(np.tensordot(prob_w_kv, np.multiply(prob_k, ppl_e_k), axes=(0,0)))
+        # for words given emoti ! same prob_w for different n
+        prob_w = probNormalize(np.tensordot(prob_w_kv, np.multiply(prob_k, ppl_e_k_scaled), axes=(0,0)))
         ppl_w_log = - np.sum(np.log(prob_w[docToken]))
         # for both words & emoti
         try:
-            ppl_log = - np.log(np.inner(ppl_w_k, np.multiply(ppl_e_k, prob_k)))
+            ppl_log = - (np.log(np.inner(ppl_w_k_scaled, np.multiply(ppl_e_k_scaled, prob_k)))
+                         + ppl_w_k_constant + ppl_e_k_constant)
         except FloatingPointError as e:
-            # print "prob_k"
-            # print prob_k
-            print "ppl_e_k"
-            print ppl_e_k
-            # print "ppl_w_k"
-            # print ppl_w_k
-            # print "GLV"
-            # print self.GLV
             raise e
         return ppl_w_log, ppl_e_log, ppl_log
 
