@@ -62,6 +62,7 @@ class PRET(object):
 
         # save & restore #
         self.checkpoint_file = "ckpt/PRET"
+        self.log_file = "log/PRET"
 
     def fit(self, dataDUE, dataW, corpus=None, alpha=0.1, beta=0.01, gamma=0.1, delta=0.01, zeta=0.1, max_iter=500, resume=None):
         """
@@ -83,14 +84,16 @@ class PRET(object):
         self._intermediateParameterInitialize(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken)
 
         ppl_initial = self._ppl(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken)
-        print "before training, ppl: %s" % str(ppl_initial)
+        with open(self.log_file, "a") as logf:
+            logf.write("before training, ppl: %s\n" % str(ppl_initial))
 
         ## Gibbs Sampling ##
         for epoch in range(max_iter):
             self._GibbsSamplingLocal(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken, epoch=epoch)
             self._estimateGlobal(dataDUE)
             ppl = self._ppl(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken)
-            print "epoch: %d, ppl: %s" % (epoch, str(ppl))
+            with open(self.log_file, "a") as logf:
+                logf.write("epoch: %d, ppl: %s\n" % (epoch, str(ppl)))
             self._saveCheckPoint(epoch, ppl)
 
     def _setHyperparameters(self, alpha, beta, gamma, delta, zeta):
@@ -152,7 +155,7 @@ class PRET(object):
 
 
         duration = datetime.now() - start
-        print "_initialize() takes %fs" % duration.total_seconds()
+        self._log("_initialize() takes %fs" % duration.total_seconds())
 
     def _intermediateParameterInitialize(self, dataDUE, dataW, dataToken):
         start = datetime.now()
@@ -189,7 +192,7 @@ class PRET(object):
                 self.DXE[d, x, e] += 1
 
         duration = datetime.now() - start
-        print "_intermediateParameterInitialize() takes %fs" % duration.total_seconds()
+        self._log("_intermediateParameterInitialize() takes %fs" % duration.total_seconds())
 
     def _GibbsSamplingLocal(self, dataDUE, dataW, dataToken, epoch):
         """
@@ -197,6 +200,7 @@ class PRET(object):
                         document-level topic
                         emoticon-level group
         """
+        start = datetime.now()
         pbar = tqdm(dataDUE.generate(),
                     total = self.D,
                     desc = '({0:^3})'.format(epoch))
@@ -237,6 +241,8 @@ class PRET(object):
             #         logf.write(" # cal probability: %f s, %%%f in total\n" % (self.t_x_2, self.t_x_2 / duration))
             #         logf.write(" # cal new sample: %f s, %%%f in total\n" % (self.t_x_3, self.t_x_3 / duration))
             #         logf.write(" # cal update: %f s, %%%f in total\n\n" % (self.t_x_4, self.t_x_4 / duration))
+        duration = (datetime.now() - start).total_seconds()
+        self._log("_GibbsSamplingLocal takes %fs" % duration)
 
     def _doc_z_update(self, d, doc_u, doc_e, docW, docToken):
         """ update document-level topic """
@@ -407,7 +413,7 @@ class PRET(object):
 
     def _ppl(self, dataDUE, dataW, dataToken, epoch=-1):
         start = datetime.now()
-        print "start _ppl"
+        self._log("start _ppl")
 
         ppl_w_log = 0
         ppl_e_log = 0
@@ -420,7 +426,7 @@ class PRET(object):
             try:
                 doc_ppl_log = self._ppl_log_single_document(docdata)
             except FloatingPointError as e:
-                print "encounting underflow problem, no need to continue"
+                self._log("encounting underflow problem, no need to continue")
                 return np.nan, np.nan, np.nan
             ppl_w_log += doc_ppl_log[0]
             ppl_e_log += doc_ppl_log[1]
@@ -431,7 +437,7 @@ class PRET(object):
         ppl_log /= self.D
 
         duration = (datetime.now() - start).total_seconds()
-        print "_ppl takes %fs" % duration
+        self._log("_ppl takes %fs" % duration)
 
         return ppl_w_log, ppl_e_log, ppl_log                                # word & emoti not separable
 
@@ -488,7 +494,7 @@ class PRET(object):
             cPickle.dump(state, f_ckpt)
 
         duration = datetime.now() - start
-        print "_saveCheckPoint takes %f s" % duration.total_seconds()
+        self._log("_saveCheckPoint takes %f s" % duration.total_seconds())
 
     def _restoreCheckPoint(self, filename=None):
         start = datetime.now()
@@ -517,3 +523,7 @@ class PRET(object):
 
         duration = datetime.now() - start
         print "_restoreCheckPoint takes %f s" % duration.total_seconds()
+
+    def _log(self, string):
+        with open(self.log_file, "a") as logf:
+            logf.write(string.rstrip("\n") + "\n")

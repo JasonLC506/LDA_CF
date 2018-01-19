@@ -95,6 +95,7 @@ class PRET_SVI(object):
 
         # save & store #
         self.checkpoint_file = "ckpt/PRET_SVI"
+        self.log_file = "log/PRET_SVI"
 
         # multiprocess #
         self.pool = None
@@ -127,15 +128,15 @@ class PRET_SVI(object):
         # self.pool = Pool(processes=N_workers)
 
         ### test ###
-        # self._estimateGlobal()
-        # ppl_initial = self._ppl(dataDUE, dataW=dataW, dataToken=dataToken, epoch=-1)
-        # print "before training, ppl: %s" % str(ppl_initial)
+        self._estimateGlobal()
+        ppl_initial = self._ppl(dataDUE, dataW=dataW, dataToken=dataToken, epoch=-1)
+        self._log("before training, ppl: %s" % str(ppl_initial))
 
         for epoch in range(max_iter):
             self._fit_single_epoch(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken, epoch=epoch, batch_size=batch_size)
             self._estimateGlobal()
             ppl = self._ppl(dataDUE, dataW=dataW, dataToken=dataToken, epoch=epoch)
-            print "epoch: %d, ppl: %s" % (epoch, str(ppl))
+            self._log("epoch: %d, ppl: %s" % (epoch, str(ppl)))
             self._saveCheckPoint(epoch, ppl)
 
     def _setHyperparameters(self, alpha, beta, gamma, delta, zeta):
@@ -160,7 +161,7 @@ class PRET_SVI(object):
             dataToken.append(docToken)
 
         duration = datetime.now() - start
-        print "_matrix2corpus() takes %fs" % duration.total_seconds()
+        self._log("_matrix2corpus() takes %fs" % duration.total_seconds())
         return dataToken
 
     def _setDataDimension(self, dataDUE, dataW, dataToken):
@@ -206,7 +207,8 @@ class PRET_SVI(object):
 
     def _fit_single_epoch(self, dataDUE, dataW, dataToken, epoch, batch_size):
         """ single process"""
-        print "start _fit_single_epoch"
+        self._log("start _fit_single_epoch")
+        start = datetime.now()
 
         # uniformly sampling all documents once #
         pbar = tqdm(dataDUE.batchGenerate(batch_size=batch_size),
@@ -228,6 +230,8 @@ class PRET_SVI(object):
             self._fit_single_batch_global_update(var_temp, batch_size_real, epoch)
             # end4 = datetime.now()###
             # print "_fit_single_batch_global_update takes %fs" % (end4 - end3).total_seconds()###
+        duration = (datetime.now() - start).total_seconds()
+        self._log("_fit_single_epoch takes %fs" % duration)
 
     def _fit_single_epoch_pars_topass(self):
         ans = vars(self)
@@ -242,7 +246,7 @@ class PRET_SVI(object):
 
     def _ppl(self, dataDUE, dataW, dataToken, epoch=-1):
         start = datetime.now()
-        print "start _ppl"
+        self._log("start _ppl")
 
         ppl_w_log = 0
         ppl_e_log = 0
@@ -254,7 +258,7 @@ class PRET_SVI(object):
             try:
                 doc_ppl_log = self._ppl_log_single_document(docdata)
             except FloatingPointError as e:
-                print "encounting underflow problem, no need to continue"
+                self._log("encounting underflow problem, no need to continue")
                 return np.nan, np.nan, np.nan
             ppl_w_log += doc_ppl_log[0]
             ppl_e_log += doc_ppl_log[1]
@@ -265,7 +269,7 @@ class PRET_SVI(object):
         ppl_log /= self.D
 
         duration = (datetime.now() - start).total_seconds()
-        print "_ppl takes %fs" % duration
+        self._log("_ppl takes %fs" % duration)
 
         return ppl_w_log, ppl_e_log, ppl_log                                # word & emoti not separable
 
@@ -420,7 +424,7 @@ class PRET_SVI(object):
             cPickle.dump(state, f_ckpt)
 
         duration = datetime.now() - start
-        print "_saveCheckPoint takes %f s" % duration.total_seconds()
+        self._log("_saveCheckPoint takes %f s" % duration.total_seconds())
 
     def _restoreCheckPoint(self, filename=None):
         start = datetime.now()
@@ -453,6 +457,9 @@ class PRET_SVI(object):
         # for model display #
         self._estimateGlobal()
 
+    def _log(self, string):
+        with open(self.log_file, "a") as logf:
+            logf.write(string.rstrip("\n") + "\n")
 
 if __name__ == "__main__":
     model = PRET_SVI(2,1)

@@ -30,8 +30,8 @@ def training(dataW, batch_rBp_dir, dataDUE_loader=dataDUELoader, dataToken=None,
     dataDUE = dataDUE_loader(meta_data_file=meta_data_file, batch_data_dir=batch_rBp_dir, dataToken=dataToken, id_map=id_map_reverse,
                              random_shuffle=random_shuffle)
 
-    print "start training model %s, with hyperparameters %s"  % (str(Model.__name__), str(hyperparameters))
-    print "with data D: %d" % len(dataToken)
+    model._log("start training model %s, with hyperparameters %s"  % (str(Model.__name__), str(hyperparameters)))
+    model._log("with data D: %d" % len(dataToken))
     if str(Model.__name__) == "PRET_SVI":
         model.fit(dataDUE, dataW, corpus=dataToken, resume= resume, batch_size=batch_size, lr_init=lr_init, lr_kappa=lr_kappa)
     elif str(Model.__name__) == "PRET":
@@ -93,7 +93,7 @@ def modelDisplay(word_dictionary, Model=PRET, hyperparameters = [], resume=None)
 
 if __name__ == "__main__":
     K = 10
-    G = 3
+    G = 6
     training(dataW, batch_rBp_dir,
              dataToken=dataToken,
              Model=PRET_SVI,
@@ -101,5 +101,5 @@ if __name__ == "__main__":
              hyperparameters=[K, G],
              id_map_reverse = id_map_reverse,
              resume = None)
-    # modelDisplay(word_dictionary, Model=PRET, hyperparameters=[K, G], resume="ckpt/PRET_K10_G6")
+    # modelDisplay(word_dictionary, Model=PRET_SVI, hyperparameters=[K, G], resume="ckpt/PRET_SVI")
 
