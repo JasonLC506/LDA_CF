@@ -19,7 +19,7 @@ def _fit_batchIntermediateInitialize(pars_topass):
         "Y1TV": np.zeros([pars_topass["K"], pars_topass["V"]], dtype=np.float64),
         "TXE": np.zeros([pars_topass["K"], pars_topass["G"], pars_topass["E"]], dtype=np.float64),
         "D_batch": 0,                                                                               # batch documents count
-        "z": np.zeros([pars_topass["D"], pars_topass["K"]], dtype=np.float64)   ## if not needed,
+        # "z": np.zeros([pars_topass["D"], pars_topass["K"]], dtype=np.float64)   ## if not needed,
     }
     return vars
 
@@ -27,7 +27,7 @@ def _fit_single_batch_cumulate(returned_fit_single_document, var_temp):
     d, doc_z, doc_YI, doc_Y0V, doc_u, doc_x, doc_Y1TV, doc_TXE = returned_fit_single_document  # parse returned from self._fit_single_document
 
     var_temp["D_batch"] += 1
-    var_temp["z"][d, :] = doc_z[:]                                  # update document-level topic #
+    # var_temp["z"][d, :] = doc_z[:]                                  # update document-level topic #
     var_temp["TI"] += doc_z
     var_temp["YI"] += doc_YI
     var_temp["Y0V"] += doc_Y0V
@@ -46,7 +46,8 @@ def _fit_single_document(docdata, pars_topass, max_iter_inner=500):
 
     d, docToken, [doc_u, doc_e] = docdata
 
-    doc_z = pars_topass["z"][d].copy()
+    # doc_z = pars_topass["z"][d].copy()
+    doc_z = probNormalize(np.random.random([pars_topass["K"]]))
     doc_Nd = pars_topass["Nd"][d]
     doc_Md = pars_topass["Md"][d]
     doc_x_old = np.zeros([doc_Md, pars_topass["G"]])
