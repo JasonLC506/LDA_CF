@@ -240,14 +240,28 @@ class PRET_SVI(object):
         pbar = tqdm(dataDUE.batchGenerate(batch_size=batch_size_p),
                     total = N_batch_p,
                     desc = '({0:^3})'.format(epoch))
-        var_temps = []
+        # var_temps = []
         returns = []
         batch_p_cnt = 0
         for i_batch, batch_size_p_real, data_batched in pbar:
             returns.append(self.pool.apply_async())
             batch_p_cnt += 1
             if batch_p_cnt == N_processors or (i_batch == N_batch_p):
-                var_temps =
+                var_temps = self._fit_batch_cumulate_multiprocess(returns)
+                self._fit_single_batch_global_update(var_temps, batch_size_real=var_temps["D_batch"], epoch=epoch)
+                returns = []
+                batch_p_cnt = 0
+        assert batch_p_cnt == 0
+
+    def _fit_batch_cumulate_multiprocess(self, returns):
+        if len(returns) == 0:
+            return None
+        returned = returns[0].get()
+        for i in range(1, len(returns)):
+            next_returned = returns[i].get()
+            for var_name in returned:
+                returned[var_name] += next_returned[var_name]
+        return returned
 
 
     def _fit_single_epoch_pars_topass(self):
