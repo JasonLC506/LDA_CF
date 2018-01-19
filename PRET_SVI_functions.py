@@ -146,6 +146,68 @@ def _fit_single_document_return(d, doc_x, doc_y, doc_z, docToken, doc_u, doc_e, 
 
     return d, doc_z, doc_YI, doc_Y0V, doc_u, doc_x, doc_Y1TV, doc_TXE
 
+
+
+def _ppl_new_process(data_queue, N_doc, pars_topass, epoch):
+    start = datetime.now()
+    _log("start _ppl", pars_topass["log_file"])
+
+    ppl_w_log = 0
+    ppl_e_log = 0
+    ppl_log = 0
+    for doc_cnt in range(N_doc):
+        docdata = data_queue.get(timeout=100)
+        try:
+            doc_ppl_log = _ppl_log_single_document(docdata, pars_topass)
+        except FloatingPointError as e:
+            _log("encounting underflow problem, no need to continue", pars_topass["log_file"])
+            return np.nan, np.nan, np.nan
+        ppl_w_log += doc_ppl_log[0]
+        ppl_e_log += doc_ppl_log[1]
+        ppl_log += doc_ppl_log[2]
+    # normalize #
+    ppl_w_log /= (sum(pars_topass["Nd"]))
+    ppl_e_log /= (sum(pars_topass["Md"]))
+    ppl_log /= pars_topass["D"]
+
+    duration = (datetime.now() - start).total_seconds()
+    _log("_ppl takes %fs" % duration, pars_topass["log_file"])
+    
+    _log("ppl for epoch %d: %s" % (epoch, str([ppl_w_log, ppl_e_log, ppl_log])), pars_topass["log_file"])
+    
+    
+def _ppl_log_single_document(docdata, pars_topass):            ### potential underflow problem
+    d, docToken, [doc_u, doc_e] = docdata
+    prob_w_kv = (pars_topass["GLV"]["phiT"] * pars_topass["GLV"]["pi"][1] + pars_topass["GLV"]["phiB"] * pars_topass["GLV"]["pi"][0])
+    ppl_w_k_log = -np.sum(np.log(prob_w_kv[:, docToken]), axis=1)
+    ppl_w_k_scaled, ppl_w_k_constant = expConstantIgnore(- ppl_w_k_log, constant_output=True) # (actual ppl^(-1))
+
+    prob_e_mk = np.dot(pars_topass["GLV"]["psi"][doc_u, :], pars_topass["GLV"]["eta"])
+    ppl_e_k_log = - np.sum(np.log(prob_e_mk[np.arange(doc_u.shape[0]), :, doc_e]), axis=0)
+    ppl_e_k_scaled, ppl_e_k_constant = expConstantIgnore(- ppl_e_k_log, constant_output=True) # (actual ppl^(-1))
+    prob_k = pars_topass["GLV"]["theta"]
+
+
+    # for emoti given words
+    prob_e_m =  probNormalize(np.tensordot(prob_e_mk, np.multiply(prob_k, ppl_w_k_scaled), axes=(1,0)))
+    ppl_e_log = - np.sum(np.log(prob_e_m[np.arange(doc_u.shape[0]), doc_e]))
+    # for words given emoti ! same prob_w for different n
+    prob_w = probNormalize(np.tensordot(prob_w_kv, np.multiply(prob_k, ppl_e_k_scaled), axes=(0,0)))
+    ppl_w_log = - np.sum(np.log(prob_w[docToken]))
+    # for both words & emoti
+    try:
+        ppl_log = - (np.log(np.inner(ppl_w_k_scaled, np.multiply(ppl_e_k_scaled, prob_k)))
+                     + ppl_w_k_constant + ppl_e_k_constant)
+    except FloatingPointError as e:
+        raise e
+    return ppl_w_log, ppl_e_log, ppl_log
+    
+def _log(string, log_file):
+    with open(log_file, "a") as logf:
+        logf.write(string.rstrip("\n") + "\n")
+    
+    
+
 """
 def _fit_single_document(self, docdata, max_iter_inner=500):
 

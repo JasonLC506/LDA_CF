@@ -45,19 +45,19 @@ dataW = cp.matrix
 model = TTM(K=5)
 # model.fit(dataE,dataW, resume=None)
 
-# ## lda ##
-# model = lda.LDA(n_topics = 10, n_iter = 1500, random_state=1)
-# model.fit(dataW)
-# topic_word = model.topic_word_
-# n_top_words = 8
-# for i, topic_dist in enumerate(topic_word):
-#     topic_words = np.array(cp.words)[np.argsort(topic_dist)][:-(n_top_words):-1]
-#     print "Topic {}: {}".format(i, ','.join(topic_words))
-# doc_topic = model.doc_topic_
-# corpus_level_topic = np.mean(doc_topic, axis = 0)
-# plt.plot(corpus_level_topic, label="corpus-level topic distribution")
-# plt.legend()
-# plt.show()
+## lda ##
+model = lda.LDA(n_topics = 10, n_iter = 1500, random_state=1)
+model.fit(dataW)
+topic_word = model.topic_word_
+n_top_words = 8
+for i, topic_dist in enumerate(topic_word):
+    topic_words = np.array(cp.words)[np.argsort(topic_dist)][:-(n_top_words):-1]
+    print "Topic {}: {}".format(i, ','.join(topic_words))
+doc_topic = model.doc_topic_
+corpus_level_topic = np.mean(doc_topic, axis = 0)
+plt.plot(corpus_level_topic, label="corpus-level topic distribution")
+plt.legend()
+plt.show()
 
 
 
@@ -89,30 +89,30 @@ model = TTM(K=5)
 # plt.legend()
 # plt.show()
 
-###### TTM ######
-model._restoreCheckPoint(filename = "ckpt/TTM")
-theta, pi, eta, phiB, phiT = model.theta, model.pi, model.eta, model.phiB, model.phiT
-# find top words for each topic #
-n_top_words = 8
-for i, topic_dist in enumerate(phiT.tolist()):
-    topic_words = np.array(cp.words)[np.argsort(topic_dist)][:-n_top_words:-1]
-    print "Topic {}: {}".format(i, ','.join(topic_words))
-n_top_words_B = 2 * n_top_words
-topic_words = np.array(cp.words)[np.argsort(phiB)][:-n_top_words_B:-1]
-print "Topic {}: {}".format("B", ",".join(topic_words))
-
-f, (ax1, ax2, ax3) = plt.subplots(1, 3)
-# corpus-level topic distribution #
-ax1.plot(theta, label="corpus-level topic distribution")
-ax1.legend()
-# topic-emotion distribution #
-for k in range(eta.shape[0]):
-    ax2.plot(eta[k], label = "topic %d" % k)
-ax2.set_title("topic-emotion distribution")
-ax2.legend()
-# topic-background distribution #
-labels_B = ["Background", "topic"]
-ax3.pie(pi, labels = labels_B, autopct='%1.1f%%')
-ax3.set_title("topic-background distribution")
-plt.legend()
-plt.show()
+# ###### TTM ######
+# model._restoreCheckPoint(filename = "ckpt/TTM")
+# theta, pi, eta, phiB, phiT = model.theta, model.pi, model.eta, model.phiB, model.phiT
+# # find top words for each topic #
+# n_top_words = 8
+# for i, topic_dist in enumerate(phiT.tolist()):
+#     topic_words = np.array(cp.words)[np.argsort(topic_dist)][:-n_top_words:-1]
+#     print "Topic {}: {}".format(i, ','.join(topic_words))
+# n_top_words_B = 2 * n_top_words
+# topic_words = np.array(cp.words)[np.argsort(phiB)][:-n_top_words_B:-1]
+# print "Topic {}: {}".format("B", ",".join(topic_words))
+#
+# f, (ax1, ax2, ax3) = plt.subplots(1, 3)
+# # corpus-level topic distribution #
+# ax1.plot(theta, label="corpus-level topic distribution")
+# ax1.legend()
+# # topic-emotion distribution #
+# for k in range(eta.shape[0]):
+#     ax2.plot(eta[k], label = "topic %d" % k)
+# ax2.set_title("topic-emotion distribution")
+# ax2.legend()
+# # topic-background distribution #
+# labels_B = ["Background", "topic"]
+# ax3.pie(pi, labels = labels_B, autopct='%1.1f%%')
+# ax3.set_title("topic-background distribution")
+# plt.legend()
+# plt.show()

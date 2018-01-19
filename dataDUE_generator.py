@@ -104,6 +104,12 @@ class dataDUELoader(object):
         for doc_cnt in range(self.D):
             yield self.data_queue.get(block=True, timeout=100)
 
+    def generateSingleBatch_packed(self, batch_size):
+        data_batched = []
+        for i_samp in xrange(batch_size):
+            data_batched.append(self.data_queue.get(block=True, timeout=100))
+        return data_batched
+
 if __name__ == "__main__":
     data_prefix = "CNN_K10_"
     batch_rBp_dir = "data/" + data_prefix + "reactionsByPost_batch"

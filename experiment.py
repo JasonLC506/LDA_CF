@@ -24,16 +24,21 @@ dataToken = cPickle.load(open(postcontent_dataToken_file, "r"))
 word_dictionary = cPickle.load(open(word_dictionary_file, "r"))
 
 def training(dataW, batch_rBp_dir, dataDUE_loader=dataDUELoader, dataToken=None, Model=PRET, hyperparameters = [], id_map_reverse = id_map_reverse, resume=None,
-             batch_size=1024, lr_init=1.0, lr_kappa=0.1, random_shuffle=False):
+             batch_size=1024, lr_init=1.0, lr_kappa=0.1, random_shuffle=False, ppl_multiprocess=True):
     K, G = hyperparameters
     model = Model(K, G)
     dataDUE = dataDUE_loader(meta_data_file=meta_data_file, batch_data_dir=batch_rBp_dir, dataToken=dataToken, id_map=id_map_reverse,
                              random_shuffle=random_shuffle)
+    if ppl_multiprocess:
+        dataDUE_valid = dataDUE_loader(meta_data_file=meta_data_file, batch_data_dir=batch_rBp_dir, dataToken=dataToken, id_map=id_map_reverse,
+                             random_shuffle=random_shuffle)
+    else:
+        dataDUE_valid = None
 
     model._log("start training model %s, with hyperparameters %s"  % (str(Model.__name__), str(hyperparameters)))
     model._log("with data D: %d" % len(dataToken))
     if str(Model.__name__) == "PRET_SVI":
-        model.fit(dataDUE, dataW, corpus=dataToken, resume= resume, batch_size=batch_size, lr_init=lr_init, lr_kappa=lr_kappa)
+        model.fit(dataDUE, dataW, corpus=dataToken, resume= resume, batch_size=batch_size, lr_init=lr_init, lr_kappa=lr_kappa, dataDUE_valid=dataDUE_valid)
     elif str(Model.__name__) == "PRET":
         model.fit(dataDUE, dataW, corpus=dataToken, resume=resume)
 
@@ -93,13 +98,13 @@ def modelDisplay(word_dictionary, Model=PRET, hyperparameters = [], resume=None)
 
 if __name__ == "__main__":
     K = 10
-    G = 6
+    G = 3
     training(dataW, batch_rBp_dir,
              dataToken=dataToken,
              Model=PRET_SVI,
              batch_size = 1024, lr_init=1.0, lr_kappa=0.1,
              hyperparameters=[K, G],
              id_map_reverse = id_map_reverse,
-             resume = None)
+             resume = "ckpt/PRET_SVI")
     # modelDisplay(word_dictionary, Model=PRET_SVI, hyperparameters=[K, G], resume="ckpt/PRET_SVI")
 

@@ -15,14 +15,14 @@ from datetime import datetime
 from tqdm import tqdm
 import cPickle
 import math
-from multiprocessing import Pool
+from multiprocessing import Pool, Process
 import warnings
 from copy import copy
 import itertools
 
 from dataDUE_generator import dataDUELoader
 from functions import EDirLog, probNormalize, probNormalizeLog, expConstantIgnore
-from PRET_SVI_functions import _fit_single_document
+from PRET_SVI_functions import _fit_single_document, _ppl_new_process
 
 np.seterr(divide='raise', over='raise')
 
@@ -99,8 +99,9 @@ class PRET_SVI(object):
 
         # multiprocess #
         self.pool = None
+        self.process = None
 
-    def fit(self, dataDUE, dataW, corpus=None, alpha=0.1, beta=0.01, gamma=0.1, delta=0.01, zeta=0.1, max_iter=500, resume=None,
+    def fit(self, dataDUE, dataW, dataDUE_valid=None, corpus=None, alpha=0.1, beta=0.01, gamma=0.1, delta=0.01, zeta=0.1, max_iter=500, resume=None,
             batch_size=1024, N_workers=4, lr_tau=1, lr_kappa=0.1, lr_init=1.0, converge_threshold_inner=0.01):
         """
         stochastic variational inference
@@ -127,17 +128,30 @@ class PRET_SVI(object):
         # set up multiprocessing pool #
         # self.pool = Pool(processes=N_workers)
 
-        ### test ###
         self._estimateGlobal()
-        ppl_initial = self._ppl(dataDUE, dataW=dataW, dataToken=dataToken, epoch=-1)
-        self._log("before training, ppl: %s" % str(ppl_initial))
+        if dataDUE_valid is None:
+            ppl_initial = self._ppl(dataDUE, dataW=dataW, dataToken=dataToken, epoch=-1)
+            self._log("before training, ppl: %s" % str(ppl_initial))
+        else:
+            self._ppl_multiprocess(dataDUE_valid, epoch=-1)
 
         for epoch in range(max_iter):
             self._fit_single_epoch(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken, epoch=epoch, batch_size=batch_size)
             self._estimateGlobal()
-            ppl = self._ppl(dataDUE, dataW=dataW, dataToken=dataToken, epoch=epoch)
-            self._log("epoch: %d, ppl: %s" % (epoch, str(ppl)))
-            self._saveCheckPoint(epoch, ppl)
+            if dataDUE_valid is None:
+                ppl = self._ppl(dataDUE, dataW=dataW, dataToken=dataToken, epoch=epoch)
+                self._log("epoch: %d, ppl: %s" % (epoch, str(ppl)))
+                self._saveCheckPoint(epoch, ppl)
+            else:
+                self._ppl_multiprocess(dataDUE_valid, epoch=epoch)
+
+    def _ppl_multiprocess(self, dataDUE_valid, epoch):
+        if self.process is not None:
+            self.process.join()             # wait until last epoch ppl result completed
+        pars_topass = self._fit_single_epoch_pars_topass()
+        self.process = Process(target=_ppl_new_process, args=(dataDUE_valid.data_queue, dataDUE_valid.D, pars_topass, epoch,))
+        self.process.daemon = True
+        self.process.start()
 
     def _setHyperparameters(self, alpha, beta, gamma, delta, zeta):
         self.alpha = alpha
@@ -239,7 +253,7 @@ class PRET_SVI(object):
         for name in ans:
             if name == "pool":
                 continue
-            if name == "GLV":
+            if name == "process":
                 continue
             pars_topass[name] = ans[name]
         return pars_topass
