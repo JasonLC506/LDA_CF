@@ -80,7 +80,7 @@ if __name__ == "__main__":
     K = 10
     G = 3
     training(dataW, batch_rBp_dir,
-             dataToken=dataToken,
+             dataToken=dataToken,               ## !!! set None when using PRET model !!! ##
              Model=PRET_SVI,
              hyperparameters=[K, G],
              id_map_reverse = id_map_reverse,

@@ -36,7 +36,7 @@ def expConstantIgnore(log_array, constant_output = False):
         print np.max(log_array), np.min(log_array)
         raise e
     if constant_output:
-        return array, log_array
+        return array, constant
     return array
 
 def multinomial(prob, size=1):

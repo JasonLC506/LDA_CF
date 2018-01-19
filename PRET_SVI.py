@@ -22,7 +22,7 @@ import itertools
 
 from dataDUE_generator import dataDUELoader
 from functions import EDirLog, probNormalize, probNormalizeLog, expConstantIgnore
-from PRET_SVI_functions import _fit_single_document
+from PRET_SVI_functions import _fit_single_document, _fit_single_processor_batch
 
 np.seterr(divide='raise', over='raise')
 
@@ -100,7 +100,7 @@ class PRET_SVI(object):
         self.pool = None
 
     def fit(self, dataDUE, dataW, corpus=None, alpha=0.1, beta=0.01, gamma=0.1, delta=0.01, zeta=0.1, max_iter=500, resume=None,
-            batch_size=128, N_workers=4, lr_tau=1, lr_kappa=0.9, lr_init=0.1, converge_threshold_inner=0.01):
+            batch_size=1024, N_workers=4, lr_tau=1, lr_kappa=0.9, lr_init=0.1, converge_threshold_inner=0.01):
         """
         stochastic variational inference
         :param dataDUE: data generator for each document id, generate [[reader_id], [emoticon]]
@@ -126,9 +126,10 @@ class PRET_SVI(object):
         # set up multiprocessing pool #
         self.pool = Pool(processes=N_workers)
 
-        self._estimateGlobal()
-        ppl_initial = self._ppl(dataDUE, dataW=dataW, dataToken=dataToken, epoch=-1)
-        print "before training, ppl: %s" % str(ppl_initial)
+        ### test ###
+        # self._estimateGlobal()
+        # ppl_initial = self._ppl(dataDUE, dataW=dataW, dataToken=dataToken, epoch=-1)
+        # print "before training, ppl: %s" % str(ppl_initial)
 
         for epoch in range(max_iter):
             self._fit_single_epoch(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken, epoch=epoch, batch_size=batch_size)
@@ -204,6 +205,7 @@ class PRET_SVI(object):
         self.GLV["eta"] = probNormalize(self.eta.data)
 
     def _fit_single_epoch(self, dataDUE, dataW, dataToken, epoch, batch_size):
+        """ single process"""
         print "start _fit_single_epoch"
 
         # uniformly sampling all documents once #
@@ -211,43 +213,42 @@ class PRET_SVI(object):
                     total = math.ceil(self.D * 1.0 / batch_size),
                     desc = '({0:^3})'.format(epoch))
         for i_batch, batch_size_real, data_batched in pbar:
-            # start = datetime.now()                                          ###
-
             var_temp = self._fit_batchIntermediateInitialize()
 
-            # end1 = datetime.now()   ###
-            # print "_fit_batchIntermediateInitialize takes %fs" % (end1 - start).total_seconds()###
-
             pars_topass = self._fit_single_epoch_pars_topass()
-
-            # end2 = datetime.now()###
-            # print "_fit_single_epoch_pars_topass takes %fs" % (end2 - end1).total_seconds()###
-
-            data_batched_topass = itertools.imap(lambda x: x + [pars_topass], data_batched)
 
             ### test ###
             # returned_cursor = self.pool.imap_unordered(_fit_single_document, data_batched_topass)
             # for returned in returned_cursor:
-            for data_batched_sample in data_batched_topass:
-                # start_single_doc = datetime.now()
-                returned = _fit_single_document(data_batched_sample)
-                # end1_single_doc = datetime.now()
-                # duration_single_doc = (end1_single_doc - start_single_doc).total_seconds()
-                # print "_fit_single_document takes %fs" % duration_single_doc
-
+            for data_batched_sample in data_batched:
+                returned = _fit_single_document(data_batched_sample, pars_topass)
                 var_temp = self._fit_single_batch_cumulate(returned, var_temp)
-                # self._fit_single_batch_cumulate(returned, var_temp)###
 
-                # duration_single_doc_2 = (datetime.now() - end1_single_doc).total_seconds()
-                # print "_fit_single_batch_cumulate takes %fs" % duration_single_doc_2
-
-            # end3 = datetime.now()###
-            # print "batch doc update %fs" % (end3 - end2).total_seconds()###
-
+            end3 = datetime.now()###
             self._fit_single_batch_global_update(var_temp, batch_size_real, epoch)
+            end4 = datetime.now()###
+            print "_fit_single_batch_global_update takes %fs" % (end4 - end3).total_seconds()###
 
-            # end4 = datetime.now()###
-            # print "_fit_single_batch_global_update takes %fs" % (end4 - end3).total_seconds()###
+    def _fit_single_epoch(self, dataDUE, dataW, dataToken, epoch, batch_size, processer_batch_size_min = 512):
+        """
+         multiprocessing
+         :param processer_batch_size_min: smaller than that is meaning less
+        """
+        N_processors = min([batch_size/processer_batch_size_min, self.pool._processes])
+        batch_size_p = batch_size / N_processors
+        N_batch_p = math.ceil(self.D * 1.0 / batch_size_p)
+        pbar = tqdm(dataDUE.batchGenerate(batch_size=batch_size_p),
+                    total = N_batch_p,
+                    desc = '({0:^3})'.format(epoch))
+        var_temps = []
+        returns = []
+        batch_p_cnt = 0
+        for i_batch, batch_size_p_real, data_batched in pbar:
+            returns.append(self.pool.apply_async())
+            batch_p_cnt += 1
+            if batch_p_cnt == N_processors or (i_batch == N_batch_p):
+                var_temps = 
+
 
     def _fit_single_epoch_pars_topass(self):
         ans = vars(self)
@@ -367,7 +368,13 @@ class PRET_SVI(object):
         return var_temp
 
     def _fit_single_batch_global_update(self, var_temp, batch_size_real, epoch):
+        # ends = []###
+        # ends.append(datetime.now())    ###
+
         lr = self._lrCal(epoch)
+
+        # ends.append(datetime.now())###
+
         batch_weight = self.D * 1.0 / batch_size_real
         new_theta_temp = self.alpha + batch_weight * var_temp["TI"]
         new_pi_temp = self.delta + batch_weight * var_temp["YI"]
@@ -375,12 +382,34 @@ class PRET_SVI(object):
         new_phiT_temp = self.beta + batch_weight * var_temp["Y1TV"]
         new_psi_temp = self.zeta + batch_weight * var_temp["UX"]
         new_eta_temp = self.gamma + batch_weight * var_temp["TXE"]
+
+        # ends.append(datetime.now())###
+
         self.theta.update(new_theta_temp, lr)
+
+        # ends.append(datetime.now())###
+
         self.pi.update(new_pi_temp, lr)
+
+        # ends.append(datetime.now())###
+
         self.phiB.update(new_phiB_temp, lr)
+
+        # ends.append(datetime.now())###
+
         self.phiT.update(new_phiT_temp, lr)
+
+        # ends.append(datetime.now())###
+
         self.psi.update(new_psi_temp, lr)
+
+        # ends.append(datetime.now())###
+
         self.eta.update(new_eta_temp, lr)
+
+        # ends.append(datetime.now())###
+
+        # print "_fit_single_batch_global_update, detail profile for ## lr, add, theta, pi, phiB, phiT, psi, eta", [(ends[i] - ends[i-1]).total_seconds() for i in range(1, len(ends))]
 
     def _lrCal(self, epoch):
         return float(self.lr["init"] * np.power((self.lr["tau"] + epoch), - self.lr["kappa"]))
@@ -391,12 +420,12 @@ class PRET_SVI(object):
         if filename is None:
             filename = self.checkpoint_file
         state = {
-            "theta": self.theta,
-            "pi": self.pi,
-            "eta": self.eta,
-            "phiT": self.phiT,
-            "phiB": self.phiB,
-            "psi": self.psi,
+            "theta": self.GLV["theta"],
+            "pi": self.GLV["pi"],
+            "eta": self.GLV["eta"],
+            "phiT": self.GLV["phiT"],
+            "phiB": self.GLV["phiB"],
+            "psi": self.GLV["psi"],
             "alpha": self.alpha,
             "beta": self.beta,
             "gamma": self.gamma,

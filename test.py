@@ -181,8 +181,8 @@ def iterGenerate(N):
         yield objGenerate(N)
 
 if __name__ == "__main__":
-    a = np.zeros([5,3])
-    b = np.array([1,2,3])
-    c = np.ones([3,3])
-    a[b,:] += c
-    print a
+    pattern = [0,0]
+    iters = itertools.imap(lambda x: [x, pattern], objGenerate(5))
+    for datasample in iters:
+        print datasample
+        datasample[-1][-1] += 1

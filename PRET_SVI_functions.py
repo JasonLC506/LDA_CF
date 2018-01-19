@@ -2,14 +2,49 @@ import numpy as np
 from warnings import warn
 from functions import *
 
-def _fit_single_document(docdata, max_iter_inner=500):
+def _fit_single_processor_batch(data_batched, pars_topass):
+    var_temp = _fit_batchIntermediateInitialize(pars_topass)
+    for docdata in data_batched:
+        returned = _fit_single_document(docdata, pars_topass)
+        var_temp = _fit_single_batch_cumulate(returned, var_temp)
+    return var_temp
+
+def _fit_batchIntermediateInitialize(pars_topass):
+    # instantiate vars every loop #
+    vars = {
+        "TI": np.zeros(pars_topass["K"], dtype=np.float64),
+        "YI": np.zeros(2, dtype=np.float64),
+        "Y0V": np.zeros(pars_topass["V"], dtype=np.float64),
+        "UX": np.zeros([pars_topass["U"], pars_topass["G"]], dtype=np.float64),
+        "Y1TV": np.zeros([pars_topass["K"], pars_topass["V"]], dtype=np.float64),
+        "TXE": np.zeros([pars_topass["K"], pars_topass["G"], pars_topass["E"]], dtype=np.float64),
+        "D_batch": 0,                                                                               # batch documents count
+        "z": np.zeros([pars_topass["D"], pars_topass["K"]], dtype=np.float64)   ## if not needed,
+    }
+    return vars
+
+def _fit_single_batch_cumulate(returned_fit_single_document, var_temp):
+    d, doc_z, doc_YI, doc_Y0V, doc_u, doc_x, doc_Y1TV, doc_TXE = returned_fit_single_document  # parse returned from self._fit_single_document
+
+    var_temp["D_batch"] += 1
+    var_temp["z"][d, :] = doc_z[:]                                  # update document-level topic #
+    var_temp["TI"] += doc_z
+    var_temp["YI"] += doc_YI
+    var_temp["Y0V"] += doc_Y0V
+    # var_temp["UX"] += doc_UX    # too sparse
+    var_temp["UX"][doc_u, :] += doc_x
+    var_temp["Y1TV"] += doc_Y1TV
+    var_temp["TXE"] += doc_TXE
+    return var_temp
+
+def _fit_single_document(docdata, pars_topass, max_iter_inner=500):
     """
     alternative optimization for local parameters for single document
     :return: [d, doc_z, doc_YI, doc_Y0V, doc_u, doc_x, doc_Y1TV, doc_TXE]
     """
     # start = datetime.now()  ###
 
-    d, docToken, [doc_u, doc_e], pars_topass = docdata
+    d, docToken, [doc_u, doc_e] = docdata
 
     doc_z = pars_topass["z"][d].copy()
     doc_Nd = pars_topass["Nd"][d]
