@@ -24,24 +24,39 @@ dataToken = cPickle.load(open(postcontent_dataToken_file, "r"))
 word_dictionary = cPickle.load(open(word_dictionary_file, "r"))
 
 def training(dataW, batch_rBp_dir, dataDUE_loader=dataDUELoader, dataToken=None, Model=PRET, hyperparameters = [], id_map_reverse = id_map_reverse, resume=None,
-             batch_size=1, random_shuffle=False):
+             batch_size=1024, lr_init=1.0, lr_kappa=0.1, random_shuffle=False):
     K, G = hyperparameters
     model = Model(K, G)
     dataDUE = dataDUE_loader(meta_data_file=meta_data_file, batch_data_dir=batch_rBp_dir, dataToken=dataToken, id_map=id_map_reverse,
-                             batch_size=batch_size, random_shuffle=random_shuffle)
-    model.fit(dataDUE, dataW, corpus=dataToken, resume= resume)
+                             random_shuffle=random_shuffle)
+
+    print "start training model %s, with hyperparameters %s"  % (str(Model.__name__), str(hyperparameters))
+    print "with data D: %d" % len(dataToken)
+    if str(Model.__name__) == "PRET_SVI":
+        model.fit(dataDUE, dataW, corpus=dataToken, resume= resume, batch_size=batch_size, lr_init=lr_init, lr_kappa=lr_kappa)
+    elif str(Model.__name__) == "PRET":
+        model.fit(dataDUE, dataW, corpus=dataToken, resume=resume)
 
 def modelDisplay(word_dictionary, Model=PRET, hyperparameters = [], resume=None):
     K, G = hyperparameters
     model = Model(K, G)
     model._restoreCheckPoint(resume)
+
     ## extract paras #
-    theta = model.theta
-    pi = model.pi
-    eta = model.eta
-    psi = model.psi
-    phiB = model.phiB
-    phiT = model.phiT
+    if Model.__name__ == "PRET":
+        theta = model.theta
+        pi = model.pi
+        eta = model.eta
+        psi = model.psi
+        phiB = model.phiB
+        phiT = model.phiT
+    elif Model.__name__ == "PRET_SVI":
+        theta = model.GLV["theta"]
+        pi = model.GLV["pi"]
+        eta = model.GLV["eta"]
+        psi = model.GLV["psi"]
+        phiB = model.GLV["phiB"]
+        phiT = model.GLV["phiT"]
 
     # find top words for each topic #
     n_top_words = 8
@@ -80,10 +95,11 @@ if __name__ == "__main__":
     K = 10
     G = 3
     training(dataW, batch_rBp_dir,
-             dataToken=dataToken,               ## !!! set None when using PRET model !!! ##
+             dataToken=dataToken,
              Model=PRET_SVI,
+             batch_size = 1024, lr_init=1.0, lr_kappa=0.1,
              hyperparameters=[K, G],
              id_map_reverse = id_map_reverse,
              resume = None)
-    # modelDisplay(word_dictionary, hyperparameters=[K, G], resume="ckpt/PRET_K10_G3")
+    # modelDisplay(word_dictionary, Model=PRET, hyperparameters=[K, G], resume="ckpt/PRET_K10_G6")
 

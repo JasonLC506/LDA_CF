@@ -166,9 +166,8 @@ class PRET(object):
         self.DY1V = lil_matrix((self.D, self.V), dtype = np.int8)
         self.DXE = np.zeros([self.D, self.G, self.E], dtype = np.int32)
 
-        for d, [doc_u, doc_e] in dataDUE.generate():
+        for d, docToken, [doc_u, doc_e] in dataDUE.generate():
             self.TI[self.z[d]] += 1
-            docToken = dataToken[d]
             doc_z = self.z[d]
             doc_y = self.y[d]
             doc_x = self.x[d]
@@ -201,8 +200,8 @@ class PRET(object):
         pbar = tqdm(dataDUE.generate(),
                     total = self.D,
                     desc = '({0:^3})'.format(epoch))
-        for d, [doc_u, doc_e] in pbar:
-            docToken = dataToken[d]
+        for d, docToken, [doc_u, doc_e] in pbar:
+            # docToken = dataToken[d]
             docW = dataW[d]
             doc_Nd = self.Nd[d]
             doc_Md = self.Md[d]
@@ -417,6 +416,7 @@ class PRET(object):
                     total=self.D,
                     desc = '{}'.format("_ppl"))
         for docdata in pbar:
+        # for docdata in dataDUE.generate():
             try:
                 doc_ppl_log = self._ppl_log_single_document(docdata)
             except FloatingPointError as e:

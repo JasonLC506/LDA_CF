@@ -22,7 +22,7 @@ import itertools
 
 from dataDUE_generator import dataDUELoader
 from functions import EDirLog, probNormalize, probNormalizeLog, expConstantIgnore
-from PRET_SVI_functions import _fit_single_document, _fit_single_processor_batch
+from PRET_SVI_functions import _fit_single_document
 
 np.seterr(divide='raise', over='raise')
 
@@ -100,7 +100,7 @@ class PRET_SVI(object):
         self.pool = None
 
     def fit(self, dataDUE, dataW, corpus=None, alpha=0.1, beta=0.01, gamma=0.1, delta=0.01, zeta=0.1, max_iter=500, resume=None,
-            batch_size=1024, N_workers=4, lr_tau=1, lr_kappa=0.9, lr_init=0.1, converge_threshold_inner=0.01):
+            batch_size=1024, N_workers=4, lr_tau=1, lr_kappa=0.1, lr_init=1.0, converge_threshold_inner=0.01):
         """
         stochastic variational inference
         :param dataDUE: data generator for each document id, generate [[reader_id], [emoticon]]
@@ -124,7 +124,7 @@ class PRET_SVI(object):
         # self._intermediateParameterInitialize(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken)
 
         # set up multiprocessing pool #
-        self.pool = Pool(processes=N_workers)
+        # self.pool = Pool(processes=N_workers)
 
         ### test ###
         # self._estimateGlobal()
@@ -224,45 +224,10 @@ class PRET_SVI(object):
                 returned = _fit_single_document(data_batched_sample, pars_topass)
                 var_temp = self._fit_single_batch_cumulate(returned, var_temp)
 
-            end3 = datetime.now()###
+            # end3 = datetime.now()###
             self._fit_single_batch_global_update(var_temp, batch_size_real, epoch)
-            end4 = datetime.now()###
-            print "_fit_single_batch_global_update takes %fs" % (end4 - end3).total_seconds()###
-
-    def _fit_single_epoch(self, dataDUE, dataW, dataToken, epoch, batch_size, processer_batch_size_min = 512):
-        """
-         multiprocessing
-         :param processer_batch_size_min: smaller than that is meaning less
-        """
-        N_processors = min([batch_size/processer_batch_size_min, self.pool._processes])
-        batch_size_p = batch_size / N_processors
-        N_batch_p = math.ceil(self.D * 1.0 / batch_size_p)
-        pbar = tqdm(dataDUE.batchGenerate(batch_size=batch_size_p),
-                    total = N_batch_p,
-                    desc = '({0:^3})'.format(epoch))
-        # var_temps = []
-        returns = []
-        batch_p_cnt = 0
-        for i_batch, batch_size_p_real, data_batched in pbar:
-            returns.append(self.pool.apply_async())
-            batch_p_cnt += 1
-            if batch_p_cnt == N_processors or (i_batch == N_batch_p):
-                var_temps = self._fit_batch_cumulate_multiprocess(returns)
-                self._fit_single_batch_global_update(var_temps, batch_size_real=var_temps["D_batch"], epoch=epoch)
-                returns = []
-                batch_p_cnt = 0
-        assert batch_p_cnt == 0
-
-    def _fit_batch_cumulate_multiprocess(self, returns):
-        if len(returns) == 0:
-            return None
-        returned = returns[0].get()
-        for i in range(1, len(returns)):
-            next_returned = returns[i].get()
-            for var_name in returned:
-                returned[var_name] += next_returned[var_name]
-        return returned
-
+            # end4 = datetime.now()###
+            # print "_fit_single_batch_global_update takes %fs" % (end4 - end3).total_seconds()###
 
     def _fit_single_epoch_pars_topass(self):
         ans = vars(self)
@@ -434,12 +399,12 @@ class PRET_SVI(object):
         if filename is None:
             filename = self.checkpoint_file
         state = {
-            "theta": self.GLV["theta"],
-            "pi": self.GLV["pi"],
-            "eta": self.GLV["eta"],
-            "phiT": self.GLV["phiT"],
-            "phiB": self.GLV["phiB"],
-            "psi": self.GLV["psi"],
+            "theta": self.theta.data,
+            "pi": self.pi.data,
+            "eta": self.eta.data,
+            "phiT": self.phiT.data,
+            "phiB": self.phiB.data,
+            "psi": self.psi.data,
             "alpha": self.alpha,
             "beta": self.beta,
             "gamma": self.gamma,
@@ -464,12 +429,12 @@ class PRET_SVI(object):
             filename = self.checkpoint_file
         state = cPickle.load(open(filename, "r"))
         # restore #
-        self.theta = state["theta"]
-        self.pi = state["pi"]
-        self.eta = state["eta"]
-        self.phiT = state["phiT"]
-        self.phiB = state["phiB"]
-        self.psi  = state["psi"]
+        self.theta.initialize(new_data=state["theta"])
+        self.pi.initialize(new_data=state["pi"])
+        self.eta.initialize(new_data=state["eta"])
+        self.phiT.initialize(new_data=state["phiT"])
+        self.phiB.initialize(new_data=state["phiB"])
+        self.psi.initialize(new_data=state["psi"])
         self.alpha = state["alpha"]
         self.beta = state["beta"]
         self.gamma = state["gamma"]
@@ -484,6 +449,9 @@ class PRET_SVI(object):
 
         duration = datetime.now() - start
         print "_restoreCheckPoint takes %f s" % duration.total_seconds()
+
+        # for model display #
+        self._estimateGlobal()
 
 
 if __name__ == "__main__":

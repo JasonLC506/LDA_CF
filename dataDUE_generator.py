@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 
 class dataDUELoader(object):
-    def __init__(self, meta_data_file, batch_data_dir, id_map, dataToken=None, max_qsize = 5000, batch_size=1, random_shuffle=False):
+    def __init__(self, meta_data_file, batch_data_dir, id_map, dataToken=None, max_qsize = 5000, random_shuffle=False):
 
         self.E = 0                                  # dimension of emotion
         self.U = 0                                  # number of users
@@ -33,7 +33,7 @@ class dataDUELoader(object):
 
         # for data generation, ! not implemented yet ! #
         # will modify self._dataBatchReader() #
-        self.batch_size = batch_size
+        # self.batch_size = batch_size
         self.random_shuffle = random_shuffle
 
         # multiprocess data reader #
@@ -50,7 +50,7 @@ class dataDUELoader(object):
                 with open(os.path.join(self.batch_data_dir, fn), "r") as f:
                     posts = cPickle.load(f)
                 duration = datetime.now() - start
-                print "_dataBatchReader: load %s takes %f s" % (fn, duration.total_seconds())
+                # print "_dataBatchReader: load %s takes %f s" % (fn, duration.total_seconds())
                 for post_id in posts:
                     if post_id not in self.id_map:
                         continue
@@ -74,13 +74,15 @@ class dataDUELoader(object):
     def batchGenerate(self, batch_size = 1):
         N_batch = self.D / batch_size
         incomplete_batch = False
-        if N_batch % batch_size != 0:
+        if self.D % batch_size != 0:
             N_batch += 1
             incomplete_batch = True
         for i_batch in xrange(N_batch):
             if i_batch == (N_batch - 1):
                 if incomplete_batch:
-                    batch_size_real = N_batch % batch_size
+                    batch_size_real = self.D % batch_size
+                else:
+                    batch_size_real = batch_size
             else:
                 batch_size_real = batch_size
             yield i_batch, batch_size_real, self.generateSingleBatch(batch_size_real)
