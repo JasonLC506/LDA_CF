@@ -247,7 +247,7 @@ class PRET_SVI(object):
             returns.append(self.pool.apply_async())
             batch_p_cnt += 1
             if batch_p_cnt == N_processors or (i_batch == N_batch_p):
-                var_temps = 
+                var_temps =
 
 
     def _fit_single_epoch_pars_topass(self):
