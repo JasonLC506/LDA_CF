@@ -24,7 +24,7 @@ dataToken = cPickle.load(open(postcontent_dataToken_file, "r"))
 word_dictionary = cPickle.load(open(word_dictionary_file, "r"))
 
 def training(dataW, batch_rBp_dir, dataDUE_loader=dataDUELoader, dataToken=None, Model=PRET, hyperparameters = [], id_map_reverse = id_map_reverse, resume=None,
-             batch_size=1024, lr_init=1.0, lr_kappa=0.1, random_shuffle=False, ppl_multiprocess=True):
+             batch_size=1024, lr_init=1.0, lr_kappa=0.1, random_shuffle=True, ppl_multiprocess=True):
     K, G = hyperparameters
     model = Model(K, G)
     dataDUE = dataDUE_loader(meta_data_file=meta_data_file, batch_data_dir=batch_rBp_dir, dataToken=dataToken, id_map=id_map_reverse,
@@ -102,9 +102,9 @@ if __name__ == "__main__":
     training(dataW, batch_rBp_dir,
              dataToken=dataToken,
              Model=PRET_SVI,
-             batch_size = 1024, lr_init=1.0, lr_kappa=0.1,
+             batch_size = len(dataToken), lr_init=1.0, lr_kappa=0.0,
              hyperparameters=[K, G],
              id_map_reverse = id_map_reverse,
-             resume = "ckpt/PRET_SVI")
+             resume = None)
     # modelDisplay(word_dictionary, Model=PRET_SVI, hyperparameters=[K, G], resume="ckpt/PRET_SVI")
 

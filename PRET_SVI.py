@@ -95,6 +95,7 @@ class PRET_SVI(object):
 
         # save & store #
         self.checkpoint_file = "ckpt/PRET_SVI"
+        self.epoch_init = 0
         self.log_file = "log/PRET_SVI"
 
         # multiprocess #
@@ -135,7 +136,7 @@ class PRET_SVI(object):
         else:
             self._ppl_multiprocess(dataDUE_valid, epoch=-1)
 
-        for epoch in range(max_iter):
+        for epoch in range(self.epoch_init, max_iter):
             self._fit_single_epoch(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken, epoch=epoch, batch_size=batch_size)
             self._estimateGlobal()
             if dataDUE_valid is None:
@@ -144,6 +145,7 @@ class PRET_SVI(object):
                 self._saveCheckPoint(epoch, ppl)
             else:
                 self._ppl_multiprocess(dataDUE_valid, epoch=epoch)
+                self._saveCheckPoint(epoch)
 
     def _ppl_multiprocess(self, dataDUE_valid, epoch):
         if self.process is not None:
@@ -225,7 +227,7 @@ class PRET_SVI(object):
         start = datetime.now()
 
         # uniformly sampling all documents once #
-        pbar = tqdm(dataDUE.batchGenerate(batch_size=batch_size),
+        pbar = tqdm(dataDUE.batchGenerate(batch_size=batch_size, keep_complete=True),
                     total = math.ceil(self.D * 1.0 / batch_size),
                     desc = '({0:^3})'.format(epoch))
         for i_batch, batch_size_real, data_batched in pbar:
@@ -461,9 +463,9 @@ class PRET_SVI(object):
         self.z = state["z"]
         # self.y = state["y"]
         # self.x = state["x"]
-        epoch = state["epoch"]
+        self.epoch_init = state["epoch"] + 1
         ppl = state["ppl"]
-        print "restore state from file '%s' on epoch %d with ppl: %s" % (filename, epoch, str(ppl))
+        print "restore state from file '%s' on epoch %d with ppl: %s" % (filename, state["epoch"], str(ppl))
 
         duration = datetime.now() - start
         print "_restoreCheckPoint takes %f s" % duration.total_seconds()

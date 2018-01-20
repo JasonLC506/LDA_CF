@@ -8,6 +8,7 @@ import os
 from matplotlib import pyplot as plt
 import itertools
 from tqdm import tqdm
+import random
 
 from functions import *
 
@@ -181,8 +182,6 @@ def iterGenerate(N):
         yield objGenerate(N)
 
 if __name__ == "__main__":
-    pattern = [0,0]
-    iters = itertools.imap(lambda x: [x, pattern], objGenerate(5))
-    for datasample in iters:
-        print datasample
-        datasample[-1][-1] += 1
+    a = [1,2,3]
+    b = random.shuffle(a)
+    print a, b

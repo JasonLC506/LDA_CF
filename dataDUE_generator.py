@@ -4,6 +4,7 @@ import cPickle
 from multiprocessing import Process, Queue
 import os
 from datetime import datetime
+import random
 
 class dataDUELoader(object):
     def __init__(self, meta_data_file, batch_data_dir, id_map, dataToken=None, max_qsize = 5000, random_shuffle=False):
@@ -45,13 +46,19 @@ class dataDUELoader(object):
 
     def _dataBatchReader(self, data_queue, timeout=10000):
         while True:
-            for fn in os.listdir(self.batch_data_dir):
+            file_list = os.listdir(self.batch_data_dir)
+            if self.random_shuffle:
+                random.shuffle(file_list)
+            for fn in file_list:
                 start = datetime.now()
                 with open(os.path.join(self.batch_data_dir, fn), "r") as f:
                     posts = cPickle.load(f)
                 duration = datetime.now() - start
                 # print "_dataBatchReader: load %s takes %f s" % (fn, duration.total_seconds())
-                for post_id in posts:
+                post_id_list = posts.keys()
+                if self.random_shuffle:
+                    random.shuffle(post_id_list)
+                for post_id in post_id_list:
                     if post_id not in self.id_map:
                         continue
                     document_id = self.id_map[post_id]
@@ -71,7 +78,7 @@ class dataDUELoader(object):
         else:
             raise RuntimeError("self.data_reader cannot be terminated")
 
-    def batchGenerate(self, batch_size = 1):
+    def batchGenerate(self, batch_size = 1, keep_complete=True):
         N_batch = self.D / batch_size
         incomplete_batch = False
         if self.D % batch_size != 0:
@@ -85,6 +92,8 @@ class dataDUELoader(object):
                     batch_size_real = batch_size
             else:
                 batch_size_real = batch_size
+            if keep_complete:
+                batch_size_real = batch_size # even using more than one epoch data, keep batch_size the same
             yield i_batch, batch_size_real, self.generateSingleBatch(batch_size_real)
 
     def generateSingleBatch(self, batch_size):
