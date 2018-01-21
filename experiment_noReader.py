@@ -42,22 +42,22 @@ print "V", cp.matrix.shape[1]
 print "E", dataE.shape[1]
 
 dataW = cp.matrix
-model = TTM(K=5)
-# model.fit(dataE,dataW, resume=None)
+model = TTM(K=10)
+model.fit(dataE,dataW, resume="ckpt/TTM_K10")
 
 ## lda ##
-model = lda.LDA(n_topics = 10, n_iter = 1500, random_state=1)
-model.fit(dataW)
-topic_word = model.topic_word_
-n_top_words = 8
-for i, topic_dist in enumerate(topic_word):
-    topic_words = np.array(cp.words)[np.argsort(topic_dist)][:-(n_top_words):-1]
-    print "Topic {}: {}".format(i, ','.join(topic_words))
-doc_topic = model.doc_topic_
-corpus_level_topic = np.mean(doc_topic, axis = 0)
-plt.plot(corpus_level_topic, label="corpus-level topic distribution")
-plt.legend()
-plt.show()
+# model = lda.LDA(n_topics = 10, n_iter = 1500, random_state=1)
+# model.fit(dataW)
+# topic_word = model.topic_word_
+# n_top_words = 8
+# for i, topic_dist in enumerate(topic_word):
+#     topic_words = np.array(cp.words)[np.argsort(topic_dist)][:-(n_top_words):-1]
+#     print "Topic {}: {}".format(i, ','.join(topic_words))
+# doc_topic = model.doc_topic_
+# corpus_level_topic = np.mean(doc_topic, axis = 0)
+# plt.plot(corpus_level_topic, label="corpus-level topic distribution")
+# plt.legend()
+# plt.show()
 
 
 

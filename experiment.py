@@ -68,6 +68,7 @@ def modelDisplay(word_dictionary, Model=PRET, hyperparameters = [], resume=None)
     for i, topic_dist in enumerate(phiT.tolist()):
         topic_words = np.array(word_dictionary)[np.argsort(topic_dist)][:-n_top_words:-1]
         print "Topic {}: {}".format(i, ','.join(topic_words))
+        # print topic_dist
     n_top_words_B = 2 * n_top_words
     topic_words = np.array(word_dictionary)[np.argsort(phiB)][:-n_top_words_B:-1]
     print "Topic {}: {}".format("B", ",".join(topic_words))
@@ -101,10 +102,10 @@ if __name__ == "__main__":
     G = 3
     training(dataW, batch_rBp_dir,
              dataToken=dataToken,
-             Model=PRET_SVI,
-             batch_size = len(dataToken), lr_init=1.0, lr_kappa=0.0,
+             Model=PRET_SVI, ppl_multiprocess=False,
+             batch_size = 1024, lr_init=1.0, lr_kappa=0.9,
              hyperparameters=[K, G],
              id_map_reverse = id_map_reverse,
              resume = None)
-    # modelDisplay(word_dictionary, Model=PRET_SVI, hyperparameters=[K, G], resume="ckpt/PRET_SVI")
-
+    # modelDisplay(word_dictionary, Model=PRET_SVI, hyperparameters=[K, G], resume="ckpt/PRET_SVI_K10_G3_batch_size_128_lr_kappa_0.900000")
+    # print sum(map(len, dataToken))

@@ -33,11 +33,12 @@ class latentVariableGlobal(object):
         self.data = None                                        # np.ndarray
         self.bigamma_data = None                                # EDirLog(self.data), diff of two digamma functions called bigamma
 
-    def initialize(self, shape=None, new_data=None):
+    def initialize(self, shape=None, seed=None, new_data=None):
         if new_data is not None:
             self.data = new_data
         else:
-            self.data = (np.random.random(shape) + 3.0) / 300.0
+            noise = seed * (np.random.random(shape) + 3.0) / 300.0
+            self.data = noise + seed
         self.bigamma_data = EDirLog(self.data)
 
     def update(self, new_data, lr):
@@ -58,9 +59,9 @@ class PRET_SVI(object):
         :param G: # groups
         """
         # model hyperparameters #
-        self.alpha = 0.1                                        # topic distribution prior
-        self.beta = 0.01                                        # topic-word distribution prior
-        self.gamma = 0.1                                        # (topic * group)-emotion distribution prior
+        self.alpha = 1.0 / K                                    # topic distribution prior [2]
+        self.beta = 0.0025                                      # topic-word distribution prior
+        self.gamma = 1.0                                        # (topic * group)-emotion distribution prior
         self.delta = 0.01                                       # background-vs-topic distribution prior
         self.zeta = 0.1                                         # user-group distribution
 
@@ -102,20 +103,19 @@ class PRET_SVI(object):
         self.pool = None
         self.process = None
 
-    def fit(self, dataDUE, dataW, dataDUE_valid=None, corpus=None, alpha=0.1, beta=0.01, gamma=0.1, delta=0.01, zeta=0.1, max_iter=500, resume=None,
-            batch_size=1024, N_workers=4, lr_tau=1, lr_kappa=0.1, lr_init=1.0, converge_threshold_inner=0.01):
+    def fit(self, dataDUE, dataW, dataDUE_valid=None, corpus=None, alpha=0.1, beta=0.0025, gamma=1.0, delta=0.01, zeta=0.1, max_iter=500, resume=None,
+            batch_size=1024, N_workers=4, lr_tau=2, lr_kappa=0.1, lr_init=1.0, converge_threshold_inner=0.01):
         """
         stochastic variational inference
         :param dataDUE: data generator for each document id, generate [[reader_id], [emoticon]]
         :param dataW: Indexed corpus                    np.ndarray([self.D, self.V]) scipy.sparse.csr_matrix
         """
-        self._setHyperparameters(alpha, beta, gamma, delta, zeta)
-        if corpus is None:
-            dataToken = self._matrix2corpus(dataW=dataW)
-        else:
-            dataToken = corpus
+        dataToken = corpus # ! ensure corpus/dataToken is input
 
         self._setDataDimension(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken)
+
+        self._setHyperparameters(alpha, beta, gamma, delta, zeta)
+
 
         self.lr = {"tau": lr_tau, "kappa": lr_kappa, "init": lr_init}
         self.converge_threshold_inner = converge_threshold_inner            # inner iteration for each document
@@ -133,6 +133,7 @@ class PRET_SVI(object):
         if dataDUE_valid is None:
             ppl_initial = self._ppl(dataDUE, dataW=dataW, dataToken=dataToken, epoch=-1)
             self._log("before training, ppl: %s" % str(ppl_initial))
+            ppl_best = ppl_initial                                  # keep the best ppl only in none parallel ppl way
         else:
             self._ppl_multiprocess(dataDUE_valid, epoch=-1)
 
@@ -141,11 +142,25 @@ class PRET_SVI(object):
             self._estimateGlobal()
             if dataDUE_valid is None:
                 ppl = self._ppl(dataDUE, dataW=dataW, dataToken=dataToken, epoch=epoch)
+                ppl_best, best_flag = self._ppl_compare(ppl_best, ppl)
                 self._log("epoch: %d, ppl: %s" % (epoch, str(ppl)))
                 self._saveCheckPoint(epoch, ppl)
+                for i in range(len(best_flag)):
+                    if best_flag[i]:
+                        self._saveCheckPoint(epoch=epoch, ppl=ppl, filename=self.checkpoint_file + "_best_ppl[%d]" % i)
             else:
                 self._ppl_multiprocess(dataDUE_valid, epoch=epoch)
                 self._saveCheckPoint(epoch)
+
+    def _ppl_compare(self, ppl_best, ppl):
+        N_ppl = len(ppl)
+        new_best = [ppl_best[i] for i in range(N_ppl)]
+        best_flag = [False for i in range(N_ppl)]
+        for i in range(N_ppl):
+            if ppl_best[i] > ppl[i]:
+                new_best[i] = ppl[i]
+                best_flag[i] = True
+        return new_best, best_flag
 
     def _ppl_multiprocess(self, dataDUE_valid, epoch):
         if self.process is not None:
@@ -155,31 +170,6 @@ class PRET_SVI(object):
         self.process.daemon = True
         self.process.start()
 
-    def _setHyperparameters(self, alpha, beta, gamma, delta, zeta):
-        self.alpha = alpha
-        self.beta = beta
-        self.gamma = gamma
-        self.delta = delta
-        self.zeta = zeta
-
-    """ copied from ETM """
-    def _matrix2corpus(self, dataW):
-        start = datetime.now()
-
-        dataToken = []
-        for d in range(dataW.shape[0]):
-            docW = dataW.getrow(d)
-            docToken = []
-            for w_id in docW.indices:
-                w_freq = docW[0, w_id]
-                for i in range(w_freq):
-                    docToken.append(w_id)
-            dataToken.append(docToken)
-
-        duration = datetime.now() - start
-        self._log("_matrix2corpus() takes %fs" % duration.total_seconds())
-        return dataToken
-
     def _setDataDimension(self, dataDUE, dataW, dataToken):
         self.E = dataDUE.E
         self.U = dataDUE.U
@@ -187,6 +177,32 @@ class PRET_SVI(object):
         self.D = dataW.shape[0]
         self.Nd = map(lambda x: len(x), dataToken)
         self.V = dataW.shape[1]
+
+    def _setHyperparameters(self, alpha, beta, gamma, delta, zeta):
+        self.alpha = 1.0 / self.K        # fixed based on [2]
+        self.beta = beta
+        self.gamma = beta * self.V * sum(self.Md) / (1.0 * self.E * sum(self.Nd) * self.G)
+        self.delta = delta
+        self.zeta = zeta
+        print "set up hyperparameters: alpha=%f, beta=%f, gamma=%f, delta=%f, zeta=%f" % (self.alpha, self.beta, self.gamma, self.delta, self.zeta)
+
+    # """ copied from ETM """
+    # def _matrix2corpus(self, dataW):
+    #     start = datetime.now()
+    #
+    #     dataToken = []
+    #     for d in range(dataW.shape[0]):
+    #         docW = dataW.getrow(d)
+    #         docToken = []
+    #         for w_id in docW.indices:
+    #             w_freq = docW[0, w_id]
+    #             for i in range(w_freq):
+    #                 docToken.append(w_id)
+    #         dataToken.append(docToken)
+    #
+    #     duration = datetime.now() - start
+    #     self._log("_matrix2corpus() takes %fs" % duration.total_seconds())
+    #     return dataToken
 
     def _initialize(self, dataDUE, dataW, dataToken):
         start = datetime.now()
@@ -199,12 +215,12 @@ class PRET_SVI(object):
         #     self.y.append(probNormalize(np.random.random([self.Nd[d], 2])))
         #     self.x.append(probNormalize(np.random.random([self.Md[d], self.G])))
 
-        self.theta.initialize(shape=[self.K])
-        self.pi.initialize(shape=[2])
-        self.phiB.initialize(shape=[self.V])
-        self.phiT.initialize(shape=[self.K, self.V])
-        self.psi.initialize(shape=[self.U, self.G])
-        self.eta.initialize(shape=[self.K, self.G, self.E])
+        self.theta.initialize(shape=[self.K], seed=self.alpha)
+        self.pi.initialize(shape=[2], seed=self.delta)
+        self.phiB.initialize(shape=[self.V], seed=self.beta)
+        self.phiT.initialize(shape=[self.K, self.V], seed=self.beta)
+        self.psi.initialize(shape=[self.U, self.G], seed=self.zeta)
+        self.eta.initialize(shape=[self.K, self.G, self.E], seed=self.gamma)
 
         duration = (datetime.now() - start).total_seconds()
         print "_initialize takes %fs" % duration

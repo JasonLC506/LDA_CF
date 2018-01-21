@@ -61,6 +61,11 @@ def _fit_single_document(docdata, pars_topass, max_iter_inner=500):
     # end4 = datetime.now() ###
 
     for inner_iter in xrange(max_iter_inner):
+        # print "doc_x", doc_x_old
+        # print "doc_y", doc_y_old
+        # print "doc_z", doc_z
+
+
         doc_x = _fit_single_document_x_update(doc_z, doc_u, doc_e, pars_topass)
 
         # end1 = datetime.now()###
@@ -81,6 +86,9 @@ def _fit_single_document(docdata, pars_topass, max_iter_inner=500):
 
         # end4 = datetime.now()###
         # time_profile[3] += (end4 - end3).total_seconds()###
+        # print "doc_x", doc_x
+        # print "doc_y", doc_y
+        # print "doc_z", doc_z
 
         if converge_flag:
 
@@ -106,9 +114,21 @@ def _fit_single_document_y_update(doc_z, docToken, pars_topass):
     return probNormalizeLog(doc_y_unnorm_log)
 
 def _fit_single_document_z_update(doc_y, doc_x, docToken, doc_e, pars_topass):
-    doc_z_unnorm_log = np.dot(pars_topass["phiT"].bigamma_data[:, docToken], doc_y[:, 1])
-    doc_z_unnorm_log += np.tensordot(pars_topass["eta"].bigamma_data[:, :, doc_e], doc_x, axes=([2,1],[0,1]))
-    doc_z_unnorm_log += pars_topass["theta"].bigamma_data
+    doc_z_unnorm_log_w = np.dot(pars_topass["phiT"].bigamma_data[:, docToken], doc_y[:, 1])
+
+    doc_z_unnorm_log_e = np.tensordot(pars_topass["eta"].bigamma_data[:, :, doc_e], doc_x, axes=([2,1],[0,1]))
+
+    doc_z_unnorm_log_theta = pars_topass["theta"].bigamma_data
+
+    ### test ###
+    # print "for document with Md: %d, Nd: %d" % (docToken.shape[0], doc_e.shape[0])
+    # print "docE %s" % (str(list_count(doc_e, pars_topass["E"])))
+    # print "doc_z_unnorm_log_theta", doc_z_unnorm_log_theta
+    # print "doc_z_unnorm_log_w", doc_z_unnorm_log_w
+    # print "doc_z_unnorm_log_e", doc_z_unnorm_log_e
+    ### test ###
+    doc_z_unnorm_log = doc_z_unnorm_log_w + doc_z_unnorm_log_e + doc_z_unnorm_log_theta
+
     return probNormalizeLog(doc_z_unnorm_log)
 
 def _fit_single_document_convergeCheck(doc_x, doc_y, doc_z, doc_x_old, doc_y_old, doc_z_old, pars_topass=None):
@@ -207,6 +227,11 @@ def _log(string, log_file):
         logf.write(string.rstrip("\n") + "\n")
     
     
+### test ###
+def list_count(doc_e, E=6):
+    count = np.zeros([doc_e.shape[0], E])
+    count[np.arange(doc_e.shape[0]), doc_e] = 1
+    return np.sum(count, axis=0)
 
 """
 def _fit_single_document(self, docdata, max_iter_inner=500):
