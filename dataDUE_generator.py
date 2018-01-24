@@ -13,22 +13,31 @@ class dataDUELoader(object):
         self.U = 0                                  # number of users
         self.Md = None                              # count of document-level total emoticons List[D]
         self.D = 0                                  # number of documents
+        self.D_current_data = 0                     # number of documents in current dataset batch_data_dir
         self.data_dir = batch_data_dir                    # data_directory
+        self.V = 0
         with open(meta_data_file, "r") as f:
             meta_data = cPickle.load(f)
             self.E = meta_data["E"]
             self.U = meta_data["U"]
             self.D = meta_data["D"]
-            self.Md = [0 for i in range(self.D)]
-            for pid in meta_data["Md"]:
-                if pid not in id_map:
-                    # print pid    ### test
-                    continue
+            self.Md = meta_data["Md"]
+            self.V = meta_data["V"]
+            self.D_current_data = meta_data["D_current_data"]
+            ## with CNN_only data ##
+            # self.Md = [0 for i in range(self.D)]
+            # for pid in meta_data["Md"]:
+            #     if pid not in id_map:
+            #         # print pid    ### test
+            #         continue
+            #
+            #     self.Md[id_map[pid]] = meta_data["Md"][pid]
 
-                self.Md[id_map[pid]] = meta_data["Md"][pid]
 
         self.id_map = id_map                        # id_map between post_id and document_id
         self.batch_data_dir = batch_data_dir
+
+        self.D_train = len(self.Md)
 
         self.dataToken = dataToken
 
@@ -47,6 +56,7 @@ class dataDUELoader(object):
     def _dataBatchReader(self, data_queue, timeout=10000):
         while True:
             file_list = os.listdir(self.batch_data_dir)
+            cnt = 0
             if self.random_shuffle:
                 random.shuffle(file_list)
             for fn in file_list:
@@ -63,11 +73,13 @@ class dataDUELoader(object):
                         continue
                     document_id = self.id_map[post_id]
                     if self.dataToken is not None:
-                        data_queue.put([document_id, np.array(self.dataToken[document_id], dtype=np.int64), map(np.array, posts[post_id])], block=True,
+                        data_queue.put([document_id, np.array(self.dataToken[document_id], dtype=np.int64), map(lambda x: np.array(x, dtype=np.int64), posts[post_id])], block=True,
                                        timeout=timeout)  # set max waiting time
                     else:
                         data_queue.put([document_id, posts[post_id]], block=True, timeout=timeout)   # set max waiting time
+                    cnt += 1
                 del posts
+            self.D_current_data = cnt
 
     def dataReaderTerminate(self):
         ## in case, to manually terminate self.data_reader ##
@@ -79,15 +91,15 @@ class dataDUELoader(object):
             raise RuntimeError("self.data_reader cannot be terminated")
 
     def batchGenerate(self, batch_size = 1, keep_complete=True):
-        N_batch = self.D / batch_size
+        N_batch = self.D_current_data / batch_size
         incomplete_batch = False
-        if self.D % batch_size != 0:
+        if self.D_current_data % batch_size != 0:
             N_batch += 1
             incomplete_batch = True
         for i_batch in xrange(N_batch):
             if i_batch == (N_batch - 1):
                 if incomplete_batch:
-                    batch_size_real = self.D % batch_size
+                    batch_size_real = self.D_current_data % batch_size
                 else:
                     batch_size_real = batch_size
             else:
@@ -110,7 +122,7 @@ class dataDUELoader(object):
         iteratively generate data for one epoch
         :param timeout: patience for waiting data
         """
-        for doc_cnt in range(self.D):
+        for doc_cnt in range(self.D_current_data):
             yield self.data_queue.get(block=True, timeout=100)
 
     def generateSingleBatch_packed(self, batch_size):

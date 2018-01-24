@@ -22,7 +22,7 @@ import itertools
 
 from dataDUE_generator import dataDUELoader
 from functions import EDirLog, probNormalize, probNormalizeLog, expConstantIgnore
-from PRET_SVI_functions import _fit_single_document, _ppl_new_process
+from PRET_SVI_functions import _fit_single_document
 
 np.seterr(divide='raise', over='raise')
 
@@ -69,9 +69,10 @@ class PRET_SVI(object):
         self.E = 0                                              # number of emotions
         self.K = K                                              # number of topics
         self.G = G                                              # number of groups
-        self.D = 0                                              # number of documents
-        self.Nd = []                                            # number of words of documents (varying over docs)
-        self.Md = []                                            # number of emotions of documents (varying over docs)
+        self.D = 0                                              # number of documents                                                              ! including off_shell text
+        self.D_train = 0                                        # number of documents in training set
+        self.Nd = []                                            # number of words of documents (varying over docs)                                 ! including off_shell text
+        self.Md = []                                            # number of emotions of documents (varying over docs)                              ! only include training data
         self.V = 0                                              # size of vocabulary
         self.U = 0                                              # number of users
 
@@ -84,7 +85,7 @@ class PRET_SVI(object):
         self.phiT = latentVariableGlobal()                      # topic-word distribution [self.K, self.V]
         self.psi = latentVariableGlobal()                       # user-group distribution [self.U, self.G]
         # local #
-        self.z = None                                           # document-level topic [self.D, self.K]                 ## !!! different from SVI original [2], save z for globally to speedup inner iteration
+        self.z = None                                           # document-level topic [self.D, self.K]                                             ! including off_shell text, need abandon in prediction
         # self.y = None                                           # word-level background-vs-topic indicator "[self.D, self.Nd, 2]"
         # self.x = None                                           # emoticon-level group indicator "[self.D, self.Md, self.G]"
 
@@ -103,7 +104,8 @@ class PRET_SVI(object):
         self.pool = None
         self.process = None
 
-    def fit(self, dataDUE, dataW, dataDUE_valid=None, corpus=None, alpha=0.1, beta=0.0025, gamma=1.0, delta=0.01, zeta=0.1, max_iter=500, resume=None,
+    def fit(self, dataDUE, dataW, dataDUE_valid_on_shell=None, dataDUE_valid_off_shell=None, corpus=None,
+            alpha=0.1, beta=0.01, gamma=1.0, delta=0.01, zeta=0.1, max_iter=500, resume=None,
             batch_size=1024, N_workers=4, lr_tau=2, lr_kappa=0.1, lr_init=1.0, converge_threshold_inner=0.01):
         """
         stochastic variational inference
@@ -130,53 +132,77 @@ class PRET_SVI(object):
         # self.pool = Pool(processes=N_workers)
 
         self._estimateGlobal()
-        if dataDUE_valid is None:
-            ppl_initial = self._ppl(dataDUE, dataW=dataW, dataToken=dataToken, epoch=-1)
-            self._log("before training, ppl: %s" % str(ppl_initial))
-            ppl_best = ppl_initial                                  # keep the best ppl only in none parallel ppl way
+        if dataDUE_valid_on_shell is None:
+            ppl_on_shell = [None, None, None]
         else:
-            self._ppl_multiprocess(dataDUE_valid, epoch=-1)
+            ppl_on_shell = self._ppl(dataDUE_valid_on_shell, epoch=-1, on_shell=True)
+
+        if dataDUE_valid_off_shell is None:
+            ppl_off_shell = [None, None, None]
+        else:
+            ppl_off_shell = self._ppl(dataDUE_valid_off_shell, epoch=-1, on_shell=False)
+
+        ppl_initial = ppl_on_shell + ppl_off_shell
+
+        self._log("before training, ppl: %s" % str(ppl_initial))
+        ppl_best = ppl_initial                                  # keep the best ppl only in none parallel ppl way
+
 
         for epoch in range(self.epoch_init, max_iter):
             self._fit_single_epoch(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken, epoch=epoch, batch_size=batch_size)
             self._estimateGlobal()
-            if dataDUE_valid is None:
-                ppl = self._ppl(dataDUE, dataW=dataW, dataToken=dataToken, epoch=epoch)
-                ppl_best, best_flag = self._ppl_compare(ppl_best, ppl)
-                self._log("epoch: %d, ppl: %s" % (epoch, str(ppl)))
-                self._saveCheckPoint(epoch, ppl)
-                for i in range(len(best_flag)):
-                    if best_flag[i]:
-                        self._saveCheckPoint(epoch=epoch, ppl=ppl, filename=self.checkpoint_file + "_best_ppl[%d]" % i)
+            if dataDUE_valid_on_shell is None:
+                ppl_on_shell = [None, None, None]
             else:
-                self._ppl_multiprocess(dataDUE_valid, epoch=epoch)
-                self._saveCheckPoint(epoch)
+                ppl_on_shell = self._ppl(dataDUE_valid_on_shell, epoch=epoch, on_shell=True)
+            if dataDUE_valid_off_shell is None:
+                ppl_off_shell = [None, None, None]
+            else:
+                ppl_off_shell = self._ppl(dataDUE_valid_off_shell, epoch=epoch, on_shell=False)
+            ppl = ppl_on_shell + ppl_off_shell
+
+            ### test ###
+            ppl_off_shell_for_on_shell = self._ppl(dataDUE_valid_on_shell, epoch, on_shell=False)
+            print "epoch: %d, ppl: %s" % (epoch, str(ppl))
+            print "ppl_off_shell for on_shell", str(ppl_off_shell_for_on_shell)
+
+            ppl_best, best_flag = self._ppl_compare(ppl_best, ppl)
+            self._log("epoch: %d, ppl: %s" % (epoch, str(ppl)))
+            self._saveCheckPoint(epoch, ppl)
+            for i in range(len(best_flag)):
+                if best_flag[i]:
+                    self._saveCheckPoint(epoch=epoch, ppl=ppl, filename=self.checkpoint_file + "_best_ppl[%d]" % i)
+
 
     def _ppl_compare(self, ppl_best, ppl):
         N_ppl = len(ppl)
         new_best = [ppl_best[i] for i in range(N_ppl)]
         best_flag = [False for i in range(N_ppl)]
         for i in range(N_ppl):
+            if ppl_best[i] is None:
+                # no such valid data to calculate #
+                continue
             if ppl_best[i] > ppl[i]:
                 new_best[i] = ppl[i]
                 best_flag[i] = True
         return new_best, best_flag
 
-    def _ppl_multiprocess(self, dataDUE_valid, epoch):
-        if self.process is not None:
-            self.process.join()             # wait until last epoch ppl result completed
-        pars_topass = self._fit_single_epoch_pars_topass()
-        self.process = Process(target=_ppl_new_process, args=(dataDUE_valid.data_queue, dataDUE_valid.D, pars_topass, epoch,))
-        self.process.daemon = True
-        self.process.start()
+    # def _ppl_multiprocess(self, dataDUE_valid, epoch):
+    #     if self.process is not None:
+    #         self.process.join()             # wait until last epoch ppl result completed
+    #     pars_topass = self._fit_single_epoch_pars_topass()
+    #     self.process = Process(target=_ppl_new_process, args=(dataDUE_valid.data_queue, dataDUE_valid.D, pars_topass, epoch,))
+    #     self.process.daemon = True
+    #     self.process.start()
 
     def _setDataDimension(self, dataDUE, dataW, dataToken):
         self.E = dataDUE.E
         self.U = dataDUE.U
         self.Md = dataDUE.Md
-        self.D = dataW.shape[0]
+        self.D = dataDUE.D
+        self.D_train = dataDUE.D_current_data
         self.Nd = map(lambda x: len(x), dataToken)
-        self.V = dataW.shape[1]
+        self.V = dataDUE.V
 
     def _setHyperparameters(self, alpha, beta, gamma, delta, zeta):
         self.alpha = 1.0 / self.K        # fixed based on [2]
@@ -244,7 +270,7 @@ class PRET_SVI(object):
 
         # uniformly sampling all documents once #
         pbar = tqdm(dataDUE.batchGenerate(batch_size=batch_size, keep_complete=True),
-                    total = math.ceil(self.D * 1.0 / batch_size),
+                    total = math.ceil(self.D_train * 1.0 / batch_size),
                     desc = '({0:^3})'.format(epoch))
         for i_batch, batch_size_real, data_batched in pbar:
             var_temp = self._fit_batchIntermediateInitialize()
@@ -276,36 +302,44 @@ class PRET_SVI(object):
             pars_topass[name] = ans[name]
         return pars_topass
 
-    def _ppl(self, dataDUE, dataW, dataToken, epoch=-1):
+    def _ppl(self, dataDUE, epoch=-1, on_shell=False):
         start = datetime.now()
         self._log("start _ppl")
 
         ppl_w_log = 0
         ppl_e_log = 0
         ppl_log = 0
-        pbar = tqdm(dataDUE.generate(),
-                    total=self.D,
-                    desc = '{}'.format("_ppl"))
-        for docdata in pbar:
+
+        Nd_sum = 0
+        Md_sum = 0
+        D_sum = 0
+
+        for docdata in dataDUE.generate():
             try:
-                doc_ppl_log = self._ppl_log_single_document(docdata)
+                if on_shell:
+                    doc_ppl_log, Nd, Md = self._ppl_log_single_document_on_shell(docdata)
+                else:
+                    doc_ppl_log, Nd, Md = self._ppl_log_single_document_off_shell(docdata)
             except FloatingPointError as e:
                 self._log("encounting underflow problem, no need to continue")
                 return np.nan, np.nan, np.nan
             ppl_w_log += doc_ppl_log[0]
             ppl_e_log += doc_ppl_log[1]
             ppl_log += doc_ppl_log[2]
+            Nd_sum += Nd
+            Md_sum += Md
+            D_sum += 1
         # normalize #
-        ppl_w_log /= (sum(self.Nd))
-        ppl_e_log /= (sum(self.Md))
-        ppl_log /= self.D
+        ppl_w_log /= Nd_sum
+        ppl_e_log /= Md_sum
+        ppl_log /= D_sum
 
         duration = (datetime.now() - start).total_seconds()
         self._log("_ppl takes %fs" % duration)
 
         return ppl_w_log, ppl_e_log, ppl_log                                # word & emoti not separable
 
-    def _ppl_log_single_document(self, docdata):            ### potential underflow problem
+    def _ppl_log_single_document_off_shell(self, docdata):            ### potential underflow problem
         d, docToken, [doc_u, doc_e] = docdata
         prob_w_kv = (self.GLV["phiT"] * self.GLV["pi"][1] + self.GLV["phiB"] * self.GLV["pi"][0])
         ppl_w_k_log = -np.sum(np.log(prob_w_kv[:, docToken]), axis=1)
@@ -329,7 +363,21 @@ class PRET_SVI(object):
                          + ppl_w_k_constant + ppl_e_k_constant)
         except FloatingPointError as e:
             raise e
-        return ppl_w_log, ppl_e_log, ppl_log
+        return [ppl_w_log, ppl_e_log, ppl_log], docToken.shape[0], doc_u.shape[0]
+
+    def _ppl_log_single_document_on_shell(self, docdata):
+        d, docToken, [doc_u, doc_e] = docdata
+
+        prob_w_kv = (self.GLV["phiT"] * self.GLV["pi"][1] + self.GLV["phiB"] * self.GLV["pi"][0])
+        prob_w = probNormalize(np.tensordot(prob_w_kv, self.z[d], axes=(0,0)))
+        ppl_w_log = -np.sum(np.log(prob_w[docToken]))
+
+        prob_e_mk = np.dot(self.GLV["psi"][doc_u, :], self.GLV["eta"])
+        prob_e_m = probNormalize(np.tensordot(prob_e_mk, self.z[d], axes=(1,0)))
+        ppl_e_log = -np.sum(np.log(prob_e_m[np.arange(doc_u.shape[0]), doc_e]))
+
+        ppl_log = ppl_w_log + ppl_e_log
+        return [ppl_w_log, ppl_e_log, ppl_log], docToken.shape[0], doc_u.shape[0]
 
     def _fit_batchIntermediateInitialize(self):
         # instantiate vars every loop #
@@ -390,7 +438,7 @@ class PRET_SVI(object):
 
         # ends.append(datetime.now())###
 
-        batch_weight = self.D * 1.0 / batch_size_real
+        batch_weight = self.D_train * 1.0 / batch_size_real
         new_theta_temp = self.alpha + batch_weight * var_temp["TI"]
         new_pi_temp = self.delta + batch_weight * var_temp["YI"]
         new_phiB_temp = self.beta + batch_weight * var_temp["Y0V"]
