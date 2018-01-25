@@ -35,7 +35,8 @@ word_dictionary = cPickle.load(open(word_dictionary_file, "r"))
 
 def training(dataW, batch_rBp_dir, batch_valid_on_shell_dir=None, batch_valid_off_shell_dir=None, dataToken=None,
              dataDUE_loader=dataDUELoader, Model=PRET_SVI, hyperparameters = [], id_map_reverse = id_map_reverse, resume=None,
-             batch_size=1024, lr_init=1.0, lr_kappa=0.1, random_shuffle=True):
+             batch_size=1024, lr_init=1.0, lr_kappa=0.1, random_shuffle=True,
+             beta = 0.01, gamma=10000, delta=0.001, zeta=0.01):
     K, G = hyperparameters
     model = Model(K, G)
     dataDUE = dataDUE_loader(meta_data_file=meta_data_train_file, batch_data_dir=batch_rBp_dir, dataToken=dataToken, id_map=id_map_reverse,
@@ -54,7 +55,9 @@ def training(dataW, batch_rBp_dir, batch_valid_on_shell_dir=None, batch_valid_of
     model._log("start training model %s, with hyperparameters %s"  % (str(Model.__name__), str(hyperparameters)))
     model._log("with data D: %d" % len(dataToken))
     if str(Model.__name__) == "PRET_SVI":
-        model.fit(dataDUE, dataW, corpus=dataToken, resume= resume, batch_size=batch_size, lr_init=lr_init, lr_kappa=lr_kappa,
+        model.fit(dataDUE, dataW, corpus=dataToken, resume= resume,
+                  batch_size=batch_size, lr_init=lr_init, lr_kappa=lr_kappa,
+                  beta=beta, gamma=gamma, delta=delta, zeta=zeta,
                   dataDUE_valid_on_shell=dataDUE_valid_on_shell, dataDUE_valid_off_shell=dataDUE_valid_off_shell)
     elif str(Model.__name__) == "PRET":
         model.fit(dataDUE, dataW, corpus=dataToken, resume=resume)
@@ -116,7 +119,7 @@ def modelDisplay(word_dictionary, Model=PRET, hyperparameters = [], resume=None)
 
 if __name__ == "__main__":
     K = 10
-    G = 3
+    G = 6
     training(dataW, batch_rBp_dir, batch_valid_on_shell_dir = batch_valid_on_shell_dir, batch_valid_off_shell_dir=batch_test_off_shell_dir,
              dataToken=dataToken,
              Model=PRET_SVI,
@@ -124,5 +127,5 @@ if __name__ == "__main__":
              hyperparameters=[K, G],
              id_map_reverse = id_map_reverse,
              resume = None)
-    # modelDisplay(word_dictionary, Model=PRET_SVI, hyperparameters=[K, G], resume="ckpt/PRET_SVI_K10_G3_batch_size_512_lr_kappa_0.900000_best_ppl[1]_best_in_best")
+    # modelDisplay(word_dictionary, Model=PRET_SVI, hyperparameters=[K, G], resume="ckpt/PRET_SVI_best_ppl[4]")
     # print sum(map(len, dataToken))

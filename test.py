@@ -182,7 +182,6 @@ def iterGenerate(N):
         yield objGenerate(N)
 
 if __name__ == "__main__":
-    a = np.zeros(3)
-    b = np.array([1,2,0,1,2,1,1,1,2,0,1])
-    a[b] += 1
-    print a
+    c = [1,2,3]
+    d = c[1:]
+    print d

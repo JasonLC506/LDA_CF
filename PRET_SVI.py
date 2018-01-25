@@ -33,12 +33,22 @@ class latentVariableGlobal(object):
         self.data = None                                        # np.ndarray
         self.bigamma_data = None                                # EDirLog(self.data), diff of two digamma functions called bigamma
 
-    def initialize(self, shape=None, seed=None, new_data=None):
+    def initialize(self, shape=None, seed=None, new_data=None, additional_noise_axis=None):
+        """
+        :param shape:
+        :param seed:
+        :param new_data:
+        :param additional_noise_axis:
+        :return:
+        """
         if new_data is not None:
             self.data = new_data
         else:
-            noise = seed * (np.random.random(shape) + 3.0) / 300.0
-            self.data = noise + seed
+            noise = (np.random.random(shape) + 3.0) / 300.0
+            if additional_noise_axis is not None:
+                noise_addition = np.random.random(shape[additional_noise_axis:])/10.0           # special for eta
+                noise += noise_addition
+            self.data = noise*seed + seed
         self.bigamma_data = EDirLog(self.data)
 
     def update(self, new_data, lr):
@@ -60,10 +70,10 @@ class PRET_SVI(object):
         """
         # model hyperparameters #
         self.alpha = 1.0 / K                                    # topic distribution prior [2]
-        self.beta = 0.0025                                      # topic-word distribution prior
-        self.gamma = 1.0                                        # (topic * group)-emotion distribution prior
-        self.delta = 0.01                                       # background-vs-topic distribution prior
-        self.zeta = 0.1                                         # user-group distribution
+        self.beta = 0.01                                        # topic-word distribution prior
+        self.gamma = 10000                                      # (topic * group)-emotion distribution prior
+        self.delta = 0.001                                      # background-vs-topic distribution prior
+        self.zeta = 0.01                                        # user-group distribution
 
         # data dimension #
         self.E = 0                                              # number of emotions
@@ -105,7 +115,7 @@ class PRET_SVI(object):
         self.process = None
 
     def fit(self, dataDUE, dataW, dataDUE_valid_on_shell=None, dataDUE_valid_off_shell=None, corpus=None,
-            alpha=0.1, beta=0.01, gamma=1.0, delta=0.01, zeta=0.1, max_iter=500, resume=None,
+            alpha=0.1, beta=0.01, gamma=10000, delta=0.001, zeta=0.01, max_iter=500, resume=None,
             batch_size=1024, N_workers=4, lr_tau=2, lr_kappa=0.1, lr_init=1.0, converge_threshold_inner=0.01):
         """
         stochastic variational inference
@@ -203,11 +213,13 @@ class PRET_SVI(object):
         self.D_train = dataDUE.D_current_data
         self.Nd = map(lambda x: len(x), dataToken)
         self.V = dataDUE.V
+        print "set data dimension,", "D", self.D, "D_train", self.D_train
 
     def _setHyperparameters(self, alpha, beta, gamma, delta, zeta):
         self.alpha = 1.0 / self.K        # fixed based on [2]
         self.beta = beta
-        self.gamma = beta * self.V * sum(self.Md) / (1.0 * self.E * sum(self.Nd) * self.G)
+        # self.gamma = beta * self.V * sum(self.Md) / (1.0 * self.E * sum(self.Nd) * self.G)
+        self.gamma = gamma
         self.delta = delta
         self.zeta = zeta
         print "set up hyperparameters: alpha=%f, beta=%f, gamma=%f, delta=%f, zeta=%f" % (self.alpha, self.beta, self.gamma, self.delta, self.zeta)
@@ -246,7 +258,7 @@ class PRET_SVI(object):
         self.phiB.initialize(shape=[self.V], seed=self.beta)
         self.phiT.initialize(shape=[self.K, self.V], seed=self.beta)
         self.psi.initialize(shape=[self.U, self.G], seed=self.zeta)
-        self.eta.initialize(shape=[self.K, self.G, self.E], seed=self.gamma)
+        self.eta.initialize(shape=[self.K, self.G, self.E], seed=self.gamma, additional_noise_axis=1)
 
         duration = (datetime.now() - start).total_seconds()
         print "_initialize takes %fs" % duration

@@ -71,7 +71,10 @@ def _fit_single_document(docdata, pars_topass, max_iter_inner=500):
         # end1 = datetime.now()###
         # time_profile[0] += (end1 - end4).total_seconds()###
 
-        doc_y = _fit_single_document_y_update(doc_z, docToken, pars_topass)
+        ### no background test ###
+        # doc_y = _fit_single_document_y_update(doc_z, docToken, pars_topass)
+        doc_y = np.zeros([docToken.shape[0],2], dtype=np.float64)
+        doc_y[:, 1] = 1.0 # no background
 
         # end2 = datetime.now()###
         # time_profile[1] += (end2 - end1).total_seconds()###
@@ -102,8 +105,9 @@ def _fit_single_document(docdata, pars_topass, max_iter_inner=500):
     return _fit_single_document_return(d, doc_x, doc_y, doc_z, docToken, doc_u, doc_e, pars_topass)
 
 def _fit_single_document_x_update(doc_z, doc_u, doc_e, pars_topass):
-    doc_x_unnorm_log = pars_topass["psi"].bigamma_data[doc_u]
-    doc_x_unnorm_log += np.transpose(np.tensordot(doc_z, pars_topass["eta"].bigamma_data, axes=(0,0)), axes=(1,0))[doc_e,:]
+    doc_x_unnorm_log_u = pars_topass["psi"].bigamma_data[doc_u]
+    doc_x_unnorm_log_e = np.transpose(np.tensordot(doc_z, pars_topass["eta"].bigamma_data, axes=(0,0)), axes=(1,0))[doc_e,:]
+    doc_x_unnorm_log = doc_x_unnorm_log_u + doc_x_unnorm_log_e
     return probNormalizeLog(doc_x_unnorm_log)
 
 def _fit_single_document_y_update(doc_z, docToken, pars_topass):
