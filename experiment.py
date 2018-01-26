@@ -117,15 +117,25 @@ def modelDisplay(word_dictionary, Model=PRET, hyperparameters = [], resume=None)
     plt.legend()
     plt.show()
 
+    z = model.z
+    for d in range(z.shape[0]):
+        print "doc %d:" %d
+        document = [word_dictionary[i] for i in dataToken[d]]
+        print document
+        print "post_id", id_map[d]
+        print "topic", z[d]
+
 if __name__ == "__main__":
     K = 10
-    G = 6
-    training(dataW, batch_rBp_dir, batch_valid_on_shell_dir = batch_valid_on_shell_dir, batch_valid_off_shell_dir=batch_test_off_shell_dir,
-             dataToken=dataToken,
-             Model=PRET_SVI,
-             batch_size = 1024, lr_init=1.0, lr_kappa=0.9,
-             hyperparameters=[K, G],
-             id_map_reverse = id_map_reverse,
-             resume = None)
-    # modelDisplay(word_dictionary, Model=PRET_SVI, hyperparameters=[K, G], resume="ckpt/PRET_SVI_best_ppl[4]")
+    G = 4
+    # training(dataW, batch_rBp_dir, batch_valid_on_shell_dir = batch_valid_on_shell_dir, batch_valid_off_shell_dir=batch_valid_off_shell_dir,
+    #          dataToken=dataToken,
+    #          Model=PRET_SVI,
+    #          batch_size = 23000, lr_init=1.0, lr_kappa=0.0,
+    #          hyperparameters=[K, G],
+    #          id_map_reverse = id_map_reverse,
+    #          resume = "ckpt/PRET_SVI_K10_G6_batch_size_27239_lr_kappa_0.000000_best_ppl[4]")
+
+    modelDisplay(word_dictionary, Model=PRET_SVI, hyperparameters=[K, G],
+                 resume="ckpt/PRET_SVI_K10_G4_batch_size_27239_lr_kappa_0.000000_beta_0.010000_gamma_1000.000000_zeta_0.010000_best_ppl[4]")
     # print sum(map(len, dataToken))

@@ -314,7 +314,7 @@ class PRET_SVI(object):
             pars_topass[name] = ans[name]
         return pars_topass
 
-    def _ppl(self, dataDUE, epoch=-1, on_shell=False):
+    def _ppl(self, dataDUE, epoch=-1, on_shell=False, display=False):
         start = datetime.now()
         self._log("start _ppl")
 
@@ -331,7 +331,8 @@ class PRET_SVI(object):
                 if on_shell:
                     doc_ppl_log, Nd, Md = self._ppl_log_single_document_on_shell(docdata)
                 else:
-                    doc_ppl_log, Nd, Md = self._ppl_log_single_document_off_shell(docdata)
+                    ### test ###
+                    doc_ppl_log, Nd, Md = self._ppl_log_single_document_off_shell(docdata, display=display)
             except FloatingPointError as e:
                 self._log("encounting underflow problem, no need to continue")
                 return np.nan, np.nan, np.nan
@@ -351,17 +352,17 @@ class PRET_SVI(object):
 
         return ppl_w_log, ppl_e_log, ppl_log                                # word & emoti not separable
 
-    def _ppl_log_single_document_off_shell(self, docdata):            ### potential underflow problem
+    def _ppl_log_single_document_off_shell(self, docdata, display=False):            ### potential underflow problem
         d, docToken, [doc_u, doc_e] = docdata
         prob_w_kv = (self.GLV["phiT"] * self.GLV["pi"][1] + self.GLV["phiB"] * self.GLV["pi"][0])
         ppl_w_k_log = -np.sum(np.log(prob_w_kv[:, docToken]), axis=1)
         ppl_w_k_scaled, ppl_w_k_constant = expConstantIgnore(- ppl_w_k_log, constant_output=True) # (actual ppl^(-1))
 
+
         prob_e_mk = np.dot(self.GLV["psi"][doc_u, :], self.GLV["eta"])
         ppl_e_k_log = - np.sum(np.log(prob_e_mk[np.arange(doc_u.shape[0]), :, doc_e]), axis=0)
         ppl_e_k_scaled, ppl_e_k_constant = expConstantIgnore(- ppl_e_k_log, constant_output=True) # (actual ppl^(-1))
         prob_k = self.GLV["theta"]
-
 
         # for emoti given words
         prob_e_m =  probNormalize(np.tensordot(prob_e_mk, np.multiply(prob_k, ppl_w_k_scaled), axes=(1,0)))
@@ -375,6 +376,17 @@ class PRET_SVI(object):
                          + ppl_w_k_constant + ppl_e_k_constant)
         except FloatingPointError as e:
             raise e
+
+        ### test ###
+        if display:
+            self._log("ppl_log_single_document_off_shell for doc %d" % d)
+            self._log("docToken %s" % str(docToken))
+            self._log("ppl_w_k_scaled %s" % str(ppl_w_k_scaled))
+            self._log("ppl_e_k_scaled %s" % str(ppl_e_k_scaled))
+            self._log("prob_e_m %s" % str(prob_e_m))
+            self._log("prob_g_m %s" % str(self.GLV["psi"][doc_u, :]))
+
+
         return [ppl_w_log, ppl_e_log, ppl_log], docToken.shape[0], doc_u.shape[0]
 
     def _ppl_log_single_document_on_shell(self, docdata):
