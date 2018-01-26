@@ -12,6 +12,7 @@ class dataDUELoader(object):
         self.E = 0                                  # dimension of emotion
         self.U = 0                                  # number of users
         self.Md = None                              # count of document-level total emoticons List[D]
+        self.Nd = None                              # count of document-level total tokens List[D]
         self.D = 0                                  # number of documents
         self.D_current_data = 0                     # number of documents in current dataset batch_data_dir
         self.data_dir = batch_data_dir                    # data_directory
@@ -22,6 +23,7 @@ class dataDUELoader(object):
             self.U = meta_data["U"]
             self.D = meta_data["D"]
             self.Md = meta_data["Md"]
+            self.Nd = meta_data["Nd"]
             self.V = meta_data["V"]
             self.D_current_data = meta_data["D_current_data"]
             ## with CNN_only data ##
