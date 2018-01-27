@@ -47,23 +47,23 @@ def _fit_single_document_z_update(doc_f, docToken, pars_topass):
 
 def _fit_single_document_f_update(doc_z, doc_x, doc_e, pars_topass):
     doc_f_unnorm_log_pi = np.dot(doc_z, pars_topass["pi"].bigamma_data)
-    doc_f_unnorm_log_e = np.sum(np.dot(doc_x, pars_topass["eta"].bigamma_data)[np.arange(doc_x.shape[0]), :, doc_e], axis=0)
+    doc_f_unnorm_log_e = np.tensordot(doc_x, pars_topass["eta"].bigamma_data[:, :, doc_e], axes=([0,1],[-1,1]))
     # doc_f_unnorm_log_e = np.tensordot(np.tensordot(doc_x, doc_e, axes=(0,0)) pars_topass["eta"].bigamma_data, axes = ([0,1], [1,2]))
     doc_f_unnorm_log = doc_f_unnorm_log_pi + doc_f_unnorm_log_e
     return probNormalizeLog(doc_f_unnorm_log)
 
 def _fit_single_document_convergeCheck(doc_x, doc_f, doc_z, doc_x_old, doc_f_old, doc_z_old, pars_topass=None):
-        """ simple square difference check"""
-        doc_Md = doc_x.shape[0]
-        diff_x = np.linalg.norm(doc_x - doc_x_old) / np.sqrt(doc_Md * pars_topass["G"])
-        diff_f = np.linalg.norm(doc_f - doc_f_old) / np.sqrt(pars_topass["A"])
-        diff_z = np.linalg.norm(doc_z - doc_z_old) / np.sqrt(pars_topass["K"])
-        diff_total = diff_x + diff_f + diff_z
-        if diff_total < pars_topass["converge_threshold_inner"]:
-            converge = True
-        else:
-            converge = False
-        return doc_x, doc_f, doc_z, converge, diff_total
+    """ simple square difference check"""
+    doc_Md = doc_x.shape[0]
+    diff_x = np.linalg.norm(doc_x - doc_x_old) / np.sqrt(doc_Md * pars_topass["G"])
+    diff_f = np.linalg.norm(doc_f - doc_f_old) / np.sqrt(pars_topass["A"])
+    diff_z = np.linalg.norm(doc_z - doc_z_old) / np.sqrt(pars_topass["K"])
+    diff_total = diff_x + diff_f + diff_z
+    if diff_total < pars_topass["converge_threshold_inner"]:
+        converge = True
+    else:
+        converge = False
+    return doc_x, doc_f, doc_z, converge, diff_total
 
 def _fit_single_document_return(d, doc_x, doc_f, doc_z, docToken, doc_u, doc_e, pars_topass):
     # start = datetime.now() ###

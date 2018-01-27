@@ -110,6 +110,7 @@ class MRT_SVI(object):
         # save & store #
         self.checkpoint_file = "ckpt/MRT_SVI"
         self.epoch_init = 0
+        self.lr_step = 0
         self.log_file = "log/MRT_SVI"
 
         # multiprocess #
@@ -429,7 +430,10 @@ class MRT_SVI(object):
         # print "_fit_single_batch_global_update, detail profile for ## lr, add, theta, pi, phiB, phiT, psi, eta", [(ends[i] - ends[i-1]).total_seconds() for i in range(1, len(ends))]
 
     def _lrCal(self, epoch):
-        return float(self.lr["init"] * np.power((self.lr["tau"] + epoch), - self.lr["kappa"]))
+        ## rather than using epoch, using lr_step ##
+        lr = float(self.lr["init"] * np.power((self.lr["tau"] + self.lr_step), - self.lr["kappa"]))
+        self.lr_step += 1
+        return lr
 
     def _ppl_compare(self, ppl_best, ppl):
         N_ppl = len(ppl)
@@ -463,6 +467,7 @@ class MRT_SVI(object):
             "z": self.z,
             "f": self.f,
             "epoch": epoch,
+            "lr_step": self.lr_step,
             "ppl": ppl
         }
         with open(filename, "w") as f_ckpt:
@@ -491,6 +496,7 @@ class MRT_SVI(object):
         self.z = state["z"]
         self.f = state["f"]
         self.epoch_init = state["epoch"] + 1
+        self.lr_step = state["lr_step"]
         ppl = state["ppl"]
         print "restore state from file '%s' on epoch %d with ppl: %s" % (filename, state["epoch"], str(ppl))
 
