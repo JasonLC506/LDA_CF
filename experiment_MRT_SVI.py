@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt
 
 ## models ##
 from MRT_SVI import MRT_SVI
+from MRT_SVI_YF import MRT_SVI_YF
 
 from dataDUE_generator import dataDUELoader
 
@@ -71,6 +72,8 @@ def modelDisplay(word_dictionary, Model=MRT_SVI, hyperparameters = [], resume=No
     psi = model.GLV["psi"]
     phi = model.GLV["phi"]
 
+    # pi = pi - np.mean(pi, axis=0, keepdims=True)
+
 
     # find top words for each topic #
     n_top_words = 8
@@ -84,7 +87,7 @@ def modelDisplay(word_dictionary, Model=MRT_SVI, hyperparameters = [], resume=No
     ax1.set_title("corpus-level topic distribution")
     # ax1.legend()
     # topic-background distribution #
-    labels_B = ["Background", "topic"]
+    # labels_B = ["Background", "topic"]
     for k in range(K):
         ax2.plot(pi[k], label="topic %d" % k)
     ax2.set_title("topic-attitude distribution")
@@ -114,6 +117,11 @@ def modelDisplay(word_dictionary, Model=MRT_SVI, hyperparameters = [], resume=No
     plt.legend()
     plt.show()
 
+    # for d in range(model.z.shape[0]):
+    #     print "document %d" % d
+    #     print model.z[d]
+    #     print model.f[d]
+
 
 if __name__ == "__main__":
     K = 10
@@ -121,7 +129,7 @@ if __name__ == "__main__":
     A = 8
     training(dataW, batch_rBp_dir, batch_valid_on_shell_dir = batch_valid_on_shell_dir, batch_valid_off_shell_dir=batch_test_off_shell_dir,
              dataToken=dataToken,
-             Model=MRT_SVI,
+             Model=MRT_SVI_YF,
              batch_size = 1024, lr_init=1.0, lr_kappa=0.9,
              beta=0.01, gamma=1.0, zeta=0.1, delta=0.01, converge_threshold_inner=0.001,
              hyperparameters=[K, G, A],
