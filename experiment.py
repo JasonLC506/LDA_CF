@@ -14,15 +14,6 @@ EMOTICON_LIST = ["LIKE", "LOVE", "SAD", "WOW", "HAHA", "ANGRY"]
 data_dir = "data/CNN_foxnews/"
 data_prefix = "_CNN_foxnews_combined_K10"
 
-batch_rBp_dir = data_dir + "K10_batch_train/"
-batch_valid_on_shell_dir = data_dir + "K10_batch_on_shell/valid/"
-batch_valid_off_shell_dir = data_dir + "K10_batch_off_shell/valid/"
-batch_test_on_shell_dir = data_dir + "K10_batch_on_shell/test/"
-batch_test_off_shell_dir = data_dir + "K10_batch_off_shell/test/"
-
-meta_data_train_file = data_dir + "meta_data_train" + data_prefix
-meta_data_off_valid_file = data_dir + "meta_data_off_shell_valid" + data_prefix
-meta_data_off_test_file = data_dir + "meta_data_off_shell_test" + data_prefix
 id_map_file = data_dir + "id_map" + data_prefix
 postcontent_dataW_file = data_dir + "dataW" + data_prefix
 postcontent_dataToken_file = data_dir + "dataToken" + data_prefix
@@ -33,16 +24,59 @@ dataW = cPickle.load(open(postcontent_dataW_file, "r"))
 dataToken = cPickle.load(open(postcontent_dataToken_file, "r"))
 word_dictionary = cPickle.load(open(word_dictionary_file, "r"))
 
+# batch_rBp_dir = data_dir + "K10_batch_train/"
+# batch_valid_on_shell_dir = data_dir + "K10_batch_on_shell/valid/"
+# batch_valid_off_shell_dir = data_dir + "K10_batch_off_shell/valid/"
+# batch_test_on_shell_dir = data_dir + "K10_batch_on_shell/test/"
+# batch_test_off_shell_dir = data_dir + "K10_batch_off_shell/test/"
+#
+# meta_data_train_file = data_dir + "meta_data_train" + data_prefix
+# meta_data_off_valid_file = data_dir + "meta_data_off_shell_valid" + data_prefix
+# meta_data_off_test_file = data_dir + "meta_data_off_shell_test" + data_prefix
+
+
+#### period_foxnews data ####
+# data_dir = "data/period_foxnews/"
+# data_prefix = "_period_foxnews_K10"
+#
+# batch_rBp_dir = data_dir + "period_foxnews_K10_batch_train/"
+# batch_valid_on_shell_dir = data_dir + "period_foxnews_K10_batch_on_shell/valid/"
+# batch_valid_off_shell_dir = data_dir + "period_foxnews_K10_batch_off_shell/valid/"
+# batch_test_on_shell_dir = data_dir + "period_foxnews_K10_batch_on_shell/test/"
+# batch_test_off_shell_dir = data_dir + "period_foxnews_K10_batch_off_shell/test/"
+#
+# meta_data_train_file = data_dir + "meta_data_train" + data_prefix
+# meta_data_off_valid_file = data_dir + "meta_data_off_shell_valid" + data_prefix
+# meta_data_off_test_file = data_dir + "meta_data_off_shell_test" + data_prefix
+# meta_data_on_valid_file = data_dir + "meta_data_on_shell_valid" + data_prefix
+# meta_data_on_test_file = data_dir + "meta_data_on_shell_test" + data_prefix
+
+
+#### period_foxnews_nolike data ####
+data_dir = "data/period_foxnews_nolike/"
+
+batch_rBp_dir = data_dir + "train/"
+batch_valid_on_shell_dir = data_dir + "on_shell/valid/"
+batch_valid_off_shell_dir = data_dir + "off_shell/valid/"
+batch_test_on_shell_dir = data_dir + "on_shell/test/"
+batch_test_off_shell_dir = data_dir + "off_shell/test/"
+
+meta_data_train_file = data_dir + "meta_data_train"
+meta_data_off_valid_file = data_dir + "meta_data_off_shell_valid"
+meta_data_off_test_file = data_dir + "meta_data_off_shell_test"
+meta_data_on_valid_file = data_dir + "meta_data_on_shell_valid"
+meta_data_on_test_file = data_dir + "meta_data_on_shell_test"
+
 def training(dataW, batch_rBp_dir, batch_valid_on_shell_dir=None, batch_valid_off_shell_dir=None, dataToken=None,
              dataDUE_loader=dataDUELoader, Model=PRET_SVI, hyperparameters = [], id_map_reverse = id_map_reverse, resume=None,
              batch_size=1024, lr_init=1.0, lr_kappa=0.1, random_shuffle=True,
-             beta = 0.01, gamma=10000, delta=0.001, zeta=0.01):
+             beta = 0.01, gamma=100, delta=0.01, zeta=0.1):
     K, G = hyperparameters
     model = Model(K, G)
     dataDUE = dataDUE_loader(meta_data_file=meta_data_train_file, batch_data_dir=batch_rBp_dir, dataToken=dataToken, id_map=id_map_reverse,
                              random_shuffle=random_shuffle)
     if batch_valid_on_shell_dir is not None:
-        dataDUE_valid_on_shell = dataDUE_loader(meta_data_file=meta_data_train_file, batch_data_dir=batch_valid_on_shell_dir, dataToken=dataToken, id_map=id_map_reverse,
+        dataDUE_valid_on_shell = dataDUE_loader(meta_data_file=meta_data_on_valid_file, batch_data_dir=batch_valid_on_shell_dir, dataToken=dataToken, id_map=id_map_reverse,
                                                 random_shuffle=False)
     else:
         dataDUE_valid_on_shell = None
@@ -53,7 +87,7 @@ def training(dataW, batch_rBp_dir, batch_valid_on_shell_dir=None, batch_valid_of
         dataDUE_valid_off_shell = None
 
     model._log("start training model %s, with hyperparameters %s"  % (str(Model.__name__), str(hyperparameters)))
-    model._log("with data D: %d" % len(dataToken))
+    model._log("with data period_foxnews D: %d" % len(dataToken))
     if str(Model.__name__) == "PRET_SVI":
         model.fit(dataDUE, dataW, corpus=dataToken, resume= resume,
                   batch_size=batch_size, lr_init=lr_init, lr_kappa=lr_kappa,
@@ -62,7 +96,7 @@ def training(dataW, batch_rBp_dir, batch_valid_on_shell_dir=None, batch_valid_of
     elif str(Model.__name__) == "PRET":
         model.fit(dataDUE, dataW, corpus=dataToken, resume=resume)
 
-def modelDisplay(word_dictionary, Model=PRET, hyperparameters = [], resume=None):
+def modelDisplay(word_dictionary, Model=PRET_SVI, hyperparameters = [], resume=None):
     K, G = hyperparameters
     model = Model(K, G)
     model._restoreCheckPoint(resume)
@@ -117,13 +151,13 @@ def modelDisplay(word_dictionary, Model=PRET, hyperparameters = [], resume=None)
     plt.legend()
     plt.show()
 
-    z = model.z
-    for d in range(z.shape[0]):
-        print "doc %d:" %d
-        document = [word_dictionary[i] for i in dataToken[d]]
-        print document
-        print "post_id", id_map[d]
-        print "topic", z[d]
+    # z = model.z
+    # for d in range(z.shape[0]):
+    #     print "doc %d:" %d
+    #     document = [word_dictionary[i] for i in dataToken[d]]
+    #     print document
+    #     print "post_id", id_map[d]
+    #     print "topic", z[d]
 
 if __name__ == "__main__":
     K = 10
@@ -134,8 +168,8 @@ if __name__ == "__main__":
     #          batch_size = 23000, lr_init=1.0, lr_kappa=0.0,
     #          hyperparameters=[K, G],
     #          id_map_reverse = id_map_reverse,
-    #          resume = "ckpt/PRET_SVI_K10_G6_batch_size_27239_lr_kappa_0.000000_best_ppl[4]")
+    #          resume = None)
 
     modelDisplay(word_dictionary, Model=PRET_SVI, hyperparameters=[K, G],
-                 resume="ckpt/PRET_SVI_K10_G4_batch_size_27239_lr_kappa_0.000000_beta_0.010000_gamma_1000.000000_zeta_0.010000_best_ppl[4]")
+                 resume="ckpt/PRET_SVI_best_ppl[4]")
     # print sum(map(len, dataToken))

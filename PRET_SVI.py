@@ -116,7 +116,7 @@ class PRET_SVI(object):
 
     def fit(self, dataDUE, dataW, dataDUE_valid_on_shell=None, dataDUE_valid_off_shell=None, corpus=None,
             alpha=0.1, beta=0.01, gamma=10000, delta=0.001, zeta=0.01, max_iter=500, resume=None,
-            batch_size=1024, N_workers=4, lr_tau=2, lr_kappa=0.1, lr_init=1.0, converge_threshold_inner=0.01):
+            batch_size=1024, N_workers=4, lr_tau=2, lr_kappa=0.1, lr_init=1.0, converge_threshold_inner=0.001):
         """
         stochastic variational inference
         :param dataDUE: data generator for each document id, generate [[reader_id], [emoticon]]
@@ -131,6 +131,10 @@ class PRET_SVI(object):
 
         self.lr = {"tau": lr_tau, "kappa": lr_kappa, "init": lr_init}
         self.converge_threshold_inner = converge_threshold_inner            # inner iteration for each document
+
+        if batch_size > self.D_train/2:
+            batch_size = self.D_train
+            print "set batch_size full %d" % self.D_train
 
         if resume is None:
             self._initialize(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken)
