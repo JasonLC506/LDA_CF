@@ -140,7 +140,10 @@ def _fit_single_document_convergeCheck(doc_x, doc_y, doc_z, doc_x_old, doc_y_old
         doc_Md = doc_x.shape[0]
         doc_Nd = doc_y.shape[0]
         diff_x = np.linalg.norm(doc_x - doc_x_old) / np.sqrt(doc_Md * pars_topass["G"])
-        diff_y = np.linalg.norm(doc_y - doc_y_old) / np.sqrt(doc_Nd * 2)
+        if doc_Nd == 0:
+            diff_y = 0
+        else:
+            diff_y = np.linalg.norm(doc_y - doc_y_old) / np.sqrt(doc_Nd * 2)
         diff_z = np.linalg.norm(doc_z - doc_z_old) / np.sqrt(pars_topass["K"])
         diff_total = diff_x + diff_y + diff_z
         if diff_total < pars_topass["converge_threshold_inner"]:

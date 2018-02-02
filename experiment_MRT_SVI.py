@@ -35,35 +35,35 @@ word_dictionary = cPickle.load(open(word_dictionary_file, "r"))
 # meta_data_off_test_file = data_dir + "meta_data_off_shell_test" + data_prefix
 
 #### period_foxnews data ####
-# data_dir = "data/period_foxnews/"
-# data_prefix = "_period_foxnews_K10"
+data_dir = "data/period_foxnews/"
+data_prefix = "_period_foxnews_K10"
+
+batch_rBp_dir = data_dir + "period_foxnews_K10_batch_train/"
+batch_valid_on_shell_dir = data_dir + "period_foxnews_K10_batch_on_shell/valid/"
+batch_valid_off_shell_dir = data_dir + "period_foxnews_K10_batch_off_shell/valid/"
+batch_test_on_shell_dir = data_dir + "period_foxnews_K10_batch_on_shell/test/"
+batch_test_off_shell_dir = data_dir + "period_foxnews_K10_batch_off_shell/test/"
+
+meta_data_train_file = data_dir + "meta_data_train" + data_prefix
+meta_data_off_valid_file = data_dir + "meta_data_off_shell_valid" + data_prefix
+meta_data_off_test_file = data_dir + "meta_data_off_shell_test" + data_prefix
+meta_data_on_valid_file = data_dir + "meta_data_on_shell_valid" + data_prefix
+meta_data_on_test_file = data_dir + "meta_data_on_shell_test" + data_prefix
+
+# #### period_foxnews_nolike data ####
+# data_dir = "data/period_foxnews_nolike/"
 #
-# batch_rBp_dir = data_dir + "period_foxnews_K10_batch_train/"
-# batch_valid_on_shell_dir = data_dir + "period_foxnews_K10_batch_on_shell/valid/"
-# batch_valid_off_shell_dir = data_dir + "period_foxnews_K10_batch_off_shell/valid/"
-# batch_test_on_shell_dir = data_dir + "period_foxnews_K10_batch_on_shell/test/"
-# batch_test_off_shell_dir = data_dir + "period_foxnews_K10_batch_off_shell/test/"
+# batch_rBp_dir = data_dir + "train/"
+# batch_valid_on_shell_dir = data_dir + "on_shell/valid/"
+# batch_valid_off_shell_dir = data_dir + "off_shell/valid/"
+# batch_test_on_shell_dir = data_dir + "on_shell/test/"
+# batch_test_off_shell_dir = data_dir + "off_shell/test/"
 #
-# meta_data_train_file = data_dir + "meta_data_train" + data_prefix
-# meta_data_off_valid_file = data_dir + "meta_data_off_shell_valid" + data_prefix
-# meta_data_off_test_file = data_dir + "meta_data_off_shell_test" + data_prefix
-# meta_data_on_valid_file = data_dir + "meta_data_on_shell_valid" + data_prefix
-# meta_data_on_test_file = data_dir + "meta_data_on_shell_test" + data_prefix
-
-#### period_foxnews_nolike data ####
-data_dir = "data/period_foxnews_nolike/"
-
-batch_rBp_dir = data_dir + "train/"
-batch_valid_on_shell_dir = data_dir + "on_shell/valid/"
-batch_valid_off_shell_dir = data_dir + "off_shell/valid/"
-batch_test_on_shell_dir = data_dir + "on_shell/test/"
-batch_test_off_shell_dir = data_dir + "off_shell/test/"
-
-meta_data_train_file = data_dir + "meta_data_train"
-meta_data_off_valid_file = data_dir + "meta_data_off_shell_valid"
-meta_data_off_test_file = data_dir + "meta_data_off_shell_test"
-meta_data_on_valid_file = data_dir + "meta_data_on_shell_valid"
-meta_data_on_test_file = data_dir + "meta_data_on_shell_test"
+# meta_data_train_file = data_dir + "meta_data_train"
+# meta_data_off_valid_file = data_dir + "meta_data_off_shell_valid"
+# meta_data_off_test_file = data_dir + "meta_data_off_shell_test"
+# meta_data_on_valid_file = data_dir + "meta_data_on_shell_valid"
+# meta_data_on_test_file = data_dir + "meta_data_on_shell_test"
 
 
 def training(dataW, batch_rBp_dir, batch_valid_on_shell_dir=None, batch_valid_off_shell_dir=None, dataToken=None,
@@ -221,13 +221,13 @@ def modelDisplay_YF(word_dictionary, Model=MRT_SVI_YF, hyperparameters = [], res
 
 if __name__ == "__main__":
     K = 10
-    G = 4
-    A = 10
+    G = 5
+    A = 20
     training(dataW, batch_rBp_dir, batch_valid_on_shell_dir = batch_valid_on_shell_dir, batch_valid_off_shell_dir=batch_test_off_shell_dir,
              dataToken=dataToken,
              Model=MRT_SVI_YF,
              batch_size = 10000, lr_init=1.0, lr_kappa=0.0,
-             beta=0.01, gamma=1.0, zeta=0.1, delta=0.1, converge_threshold_inner=0.001,
+             beta=0.01, gamma=100.0, zeta=0.1, delta=0.1, converge_threshold_inner=0.001,
              hyperparameters=[K, G, A],
              id_map_reverse = id_map_reverse,
              resume = None)

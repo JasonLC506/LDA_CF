@@ -496,7 +496,11 @@ class MRT_SVI(object):
         self.z = state["z"]
         self.f = state["f"]
         self.epoch_init = state["epoch"] + 1
-        self.lr_step = state["lr_step"]
+        try:
+            self.lr_step = state["lr_step"]
+        except KeyError as e:
+            print "earlier version with no lr_step"
+            self.lr_step = state["epoch"]
         ppl = state["ppl"]
         print "restore state from file '%s' on epoch %d with ppl: %s" % (filename, state["epoch"], str(ppl))
 

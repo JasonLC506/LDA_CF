@@ -182,6 +182,4 @@ def iterGenerate(N):
         yield objGenerate(N)
 
 if __name__ == "__main__":
-    c = [1,2,3]
-    d = c[1:]
-    print d
+    print "a&b"

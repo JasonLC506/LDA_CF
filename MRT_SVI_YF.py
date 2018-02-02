@@ -544,7 +544,7 @@ class MRT_SVI_YF(object):
             logf.write(string.rstrip("\n") + "\n")
 
 if __name__ == "__main__":
-    model = MRT_SVI(2,1)
+    model = MRT_SVI_YF(2,1)
     ans = vars(model)
     print type(ans)
     print ans
